@@ -8,6 +8,7 @@
   import ItemControls from "../components/ItemControls.svelte";
   import EffectsPanel from "../components/EffectsPanel.svelte";
   import Portrait from "../components/Portrait.svelte";
+  import CreationHelper from "../components/CreationHelper.svelte";
   import { createItem, editItem, deleteItem } from "../apps/actor-items.ts";
   import { openRollDialog, rollPower, rollDiscipline } from "../apps/RollDialogApp.ts";
   import { openXpDialog } from "../apps/XpDialogApp.ts";
@@ -55,6 +56,7 @@
   let collapsed: Record<string, boolean> = $state({});
   let expanded: Record<string, boolean> = $state({});
   let editMode = $state(false);
+  let showBuilder = $state(false);
   let dragOver = $state(false);
 
   const toggle = (key: string) => (collapsed[key] = !collapsed[key]);
@@ -132,6 +134,7 @@
           <button class="mode-toggle" class:on={editMode} onclick={() => (editMode = !editMode)} title="Toggle play / edit">
             {editMode ? "🔓 Edit" : "🔒 Play"}
           </button>
+          <button class="tool-btn" class:on={showBuilder} onclick={() => (showBuilder = !showBuilder)} title="Character creation helper">Builder</button>
           <button class="tool-btn" onclick={() => openXpDialog(doc)} title="Spend experience">Spend XP</button>
           <button class="roll-cta" onclick={openPool} title="Build a dice pool">Roll Pool</button>
         </div>
@@ -166,6 +169,10 @@
       </div>
     </div>
   </header>
+
+  {#if showBuilder}
+    <CreationHelper {doc} {snap} />
+  {/if}
 
   {#if sys.clan}
     <div class="banestrip">
@@ -581,7 +588,8 @@
     color: var(--gl-muted-2);
     cursor: pointer;
   }
-  .mode-toggle.on {
+  .mode-toggle.on,
+  .tool-btn.on {
     color: var(--gl-blood);
     border-color: var(--gl-blood);
   }

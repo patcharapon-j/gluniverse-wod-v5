@@ -84,6 +84,24 @@
   "GLUNIVERSE.Clans.caitiff": "Caitiff",
   "GLUNIVERSE.Clans.thinBlood": "Thin-Blood",
 
+  "GLUNIVERSE.PredatorTypes.alleycat": "Alley Cat",
+  "GLUNIVERSE.PredatorTypes.bagger": "Bagger",
+  "GLUNIVERSE.PredatorTypes.bloodLeech": "Blood Leech",
+  "GLUNIVERSE.PredatorTypes.cleaver": "Cleaver",
+  "GLUNIVERSE.PredatorTypes.consensualist": "Consensualist",
+  "GLUNIVERSE.PredatorTypes.farmer": "Farmer",
+  "GLUNIVERSE.PredatorTypes.osiris": "Osiris",
+  "GLUNIVERSE.PredatorTypes.sandman": "Sandman",
+  "GLUNIVERSE.PredatorTypes.sceneQueen": "Scene Queen",
+  "GLUNIVERSE.PredatorTypes.siren": "Siren",
+  "GLUNIVERSE.PredatorTypes.extortionist": "Extortionist",
+  "GLUNIVERSE.PredatorTypes.graverobber": "Graverobber",
+  "GLUNIVERSE.PredatorTypes.roadsideKiller": "Roadside Killer",
+  "GLUNIVERSE.PredatorTypes.grimReaper": "Grim Reaper",
+  "GLUNIVERSE.PredatorTypes.montero": "Montero",
+  "GLUNIVERSE.PredatorTypes.pursuer": "Pursuer",
+  "GLUNIVERSE.PredatorTypes.trapdoor": "Trapdoor",
+
   "GLUNIVERSE.Health": "Health",
   "GLUNIVERSE.Willpower": "Willpower",
   "GLUNIVERSE.Hunger": "Hunger",
@@ -111,5 +129,7 @@
   "GLUNIVERSE.Settings.AutomateRemorse.Name": "Automate Remorse outcome",
   "GLUNIVERSE.Settings.AutomateRemorse.Hint": "Apply the Remorse result automatically — clear stains on success, lower Humanity on failure.",
   "GLUNIVERSE.Settings.DefaultDifficulty.Name": "Default roll difficulty",
-  "GLUNIVERSE.Settings.DefaultDifficulty.Hint": "The difficulty the dice-pool dialog starts on when a roll doesn't specify one."
+  "GLUNIVERSE.Settings.DefaultDifficulty.Hint": "The difficulty the dice-pool dialog starts on when a roll doesn't specify one.",
+  "GLUNIVERSE.Settings.GmHud.Name": "Storyteller dice HUD",
+  "GLUNIVERSE.Settings.GmHud.Hint": "Show a floating quick dice-pool roller in the bottom-right corner for Game Masters."
 }
