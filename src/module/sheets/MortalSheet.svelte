@@ -5,6 +5,7 @@
   import AttributeGrid from "../components/AttributeGrid.svelte";
   import SkillGrid from "../components/SkillGrid.svelte";
   import ItemControls from "../components/ItemControls.svelte";
+  import EffectsPanel from "../components/EffectsPanel.svelte";
   import { createItem, editItem, deleteItem } from "../apps/actor-items.ts";
   import { openRollDialog } from "../apps/RollDialogApp.ts";
 
@@ -206,6 +207,10 @@
   <div class="foot">
     <div class="sect-h">Biography</div>
     <textarea rows="5" value={sys.biography} onchange={(e) => up("system.biography", e.currentTarget.value)}></textarea>
+  </div>
+
+  <div class="foot">
+    <EffectsPanel {doc} {snap} />
   </div>
 </div>
 

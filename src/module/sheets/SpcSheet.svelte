@@ -1,5 +1,6 @@
 <script lang="ts">
   import DotRating from "../components/DotRating.svelte";
+  import EffectsPanel from "../components/EffectsPanel.svelte";
   import { rollPool } from "../dice/roll-v5.ts";
   import { postRollCard } from "../dice/chat.ts";
 
@@ -117,6 +118,10 @@
   <div class="foot">
     <div class="sect-h">Notes</div>
     <textarea rows="5" value={sys.notes} onchange={(e) => up("system.notes", e.currentTarget.value)}></textarea>
+  </div>
+
+  <div class="foot">
+    <EffectsPanel {doc} {snap} />
   </div>
 </div>
 
