@@ -1,81 +1,21 @@
 {
   "Actor": {
-    "types": ["mortal", "vampire", "hunter"],
-    "templates": {
-      "common": {
-        "attributes": {
-          "physical": {
-            "strength": { "value": 1 },
-            "dexterity": { "value": 1 },
-            "stamina": { "value": 1 }
-          },
-          "social": {
-            "charisma": { "value": 1 },
-            "manipulation": { "value": 1 },
-            "composure": { "value": 1 }
-          },
-          "mental": {
-            "intelligence": { "value": 1 },
-            "wits": { "value": 1 },
-            "resolve": { "value": 1 }
-          }
-        },
-        "health": {
-          "value": 0,
-          "max": 0,
-          "superficial": 0,
-          "aggravated": 0
-        },
-        "willpower": {
-          "value": 0,
-          "max": 0,
-          "superficial": 0,
-          "aggravated": 0
-        },
-        "biography": ""
-      }
-    },
-    "mortal": {
-      "templates": ["common"]
-    },
-    "vampire": {
-      "templates": ["common"],
-      "hunger": { "value": 1 },
-      "humanity": { "value": 7, "stains": 0 },
-      "bloodPotency": { "value": 1 },
-      "clan": "",
-      "generation": 13
-    },
-    "hunter": {
-      "templates": ["common"],
-      "desperation": { "value": 1 },
-      "danger": { "value": 0 },
-      "creed": "",
-      "drive": ""
-    }
+    "types": ["vampire", "mortal", "ghoul", "spc", "coterie"],
+    "vampire": {},
+    "mortal": {},
+    "ghoul": {},
+    "spc": {},
+    "coterie": {}
   },
   "Item": {
-    "types": ["skill", "power", "advantage"],
-    "templates": {
-      "describable": {
-        "description": ""
-      }
-    },
-    "skill": {
-      "templates": ["describable"],
-      "value": 0,
-      "specialties": []
-    },
-    "power": {
-      "templates": ["describable"],
-      "level": 1,
-      "category": "",
-      "cost": ""
-    },
-    "advantage": {
-      "templates": ["describable"],
-      "kind": "merit",
-      "rating": 1
-    }
+    "types": ["discipline", "power", "ritual", "ceremony", "advantage", "weapon", "armor", "gear"],
+    "discipline": {},
+    "power": {},
+    "ritual": {},
+    "ceremony": {},
+    "advantage": {},
+    "weapon": {},
+    "armor": {},
+    "gear": {}
   }
 }
