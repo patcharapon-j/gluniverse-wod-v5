@@ -1,15 +1,18 @@
 /**
  * GLUniverse — World of Darkness V5
  *
- * Entry point for the Foundry VTT game system. This is intentionally a thin
- * bootstrap for now; the data models, sheets, dice mechanics, and per-splat
- * rules land during implementation.
+ * System entry point. Registers data models and sheets during `init`; the
+ * per-splat rules (VtM first) build out from here.
  */
 
-const SYSTEM_ID = "gluniverse-wod-v5";
+import { SYSTEM_ID } from "./config.ts";
+import { registerDataModels } from "./data/index.ts";
+import { registerSheets } from "./sheets/register.ts";
 
 Hooks.once("init", () => {
-  console.log(`${SYSTEM_ID} | Initializing GLUniverse World of Darkness V5`);
+  console.log(`${SYSTEM_ID} | Initializing GLUniverse — World of Darkness V5`);
+  registerDataModels();
+  registerSheets();
 });
 
 Hooks.once("ready", () => {

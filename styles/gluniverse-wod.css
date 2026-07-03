@@ -1,6 +1,66 @@
 /* GLUniverse — World of Darkness V5
- * Base stylesheet. Real sheet styling arrives during implementation. */
+ * Global design tokens + Foundry application-frame styling.
+ * Every colour and font from the locked "light parchment" VtM V5 design lives
+ * here as a custom property so a dark variant is a later token flip, not a
+ * rewrite. Component-specific styling lives inside the Svelte components.
+ */
 
-.gluniverse-wod {
-  --gluniverse-accent: #8b0000;
+@import "./fonts.css";
+
+:root {
+  /* ---- palette (light parchment) ---- */
+  --gl-stage: #17140f;
+  --gl-stage-glow: #241d15;
+  --gl-parch: #efe8da;
+  --gl-parch-raise: #f6f1e6;
+  --gl-ink: #1b1712;
+  --gl-ink-soft: #3a332a;
+  --gl-blood: #7d1013;
+  --gl-blood-bright: #a8181d;
+  --gl-line: #d8cdb4;
+  --gl-line-soft: #cabfa8;
+  --gl-line-dark: #3a3226;
+  --gl-muted: #8a8069;
+  --gl-muted-2: #5f574a;
+  --gl-faint: #6f6656;
+  --gl-gold: #b8860b;
+  --gl-good: #3f6b3a;
+  --gl-rouse-bg: #f3d9d9;
+
+  /* ---- type ---- */
+  --gl-serif: "Cormorant Garamond", Georgia, serif;
+  --gl-cond: "Oswald", "Arial Narrow", sans-serif;
+  --gl-body: "Barlow", system-ui, sans-serif;
+  --gl-semi: "Barlow Semi Condensed", "Barlow", sans-serif;
+
+  /* ---- dots / boxes ---- */
+  --gl-dot: 14px;
+  --gl-dot-sm: 11px;
+  --gl-box: 22px;
+}
+
+/* The application window frame. ApplicationV2 root gets the `gluniverse-wod`
+ * class; we let the sheet content own the parchment surface edge-to-edge. */
+.gluniverse-wod.application {
+  --color-text-primary: var(--gl-ink);
+}
+.gluniverse-wod .window-content {
+  padding: 0;
+  background: var(--gl-stage);
+  overflow: auto;
+}
+
+/* Shared sheet surface used by every actor/item sheet mount point. */
+.gl-sheet {
+  font-family: var(--gl-body);
+  color: var(--gl-ink);
+  background: var(--gl-parch);
+}
+
+/* Reduced-motion respect for any component transitions. */
+@media (prefers-reduced-motion: reduce) {
+  .gluniverse-wod * {
+    transition: none !important;
+    animation: none !important;
+  }
 }

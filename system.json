@@ -4,8 +4,8 @@
   "description": "A modern, unofficial Foundry VTT game system for the World of Darkness 5th Edition family of games (Vampire: The Masquerade, Hunter: The Reckoning, Werewolf, and more). Built as a single, shared foundation so every V5 splat can be played with one system.",
   "version": "0.0.0",
   "compatibility": {
-    "minimum": "12",
-    "verified": "13"
+    "minimum": "13",
+    "verified": "14"
   },
   "authors": [
     {
@@ -16,7 +16,8 @@
     "module/gluniverse-wod.js"
   ],
   "styles": [
-    "styles/gluniverse-wod.css"
+    "styles/gluniverse-wod.css",
+    "styles/gluniverse-components.css"
   ],
   "languages": [
     {
