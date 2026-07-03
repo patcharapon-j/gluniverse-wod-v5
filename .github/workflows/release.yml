@@ -1,0 +1,83 @@
+name: Release System
+
+# Manual-trigger only. Choose how to bump the version (patch / minor / major);
+# the workflow bumps the version, builds the system, packages it, publishes a
+# GitHub Release, and updates the "latest" manifest so existing installs can
+# update in place via the manifest link.
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: "Semantic version bump"
+        required: true
+        default: "patch"
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Bump version
+        id: bump
+        run: |
+          NEW_VERSION="$(npm version "${{ inputs.bump }}" --no-git-tag-version)"
+          NEW_VERSION="${NEW_VERSION#v}"
+          echo "version=${NEW_VERSION}" >> "$GITHUB_OUTPUT"
+          echo "Bumped to v${NEW_VERSION}"
+
+      - name: Update manifest URLs
+        run: node scripts/update-manifest.mjs "${{ steps.bump.outputs.version }}" "${{ github.repository }}"
+
+      - name: Build
+        run: npm run build
+
+      - name: Package system.zip
+        run: |
+          cd dist
+          zip -r ../system.zip .
+          cd ..
+
+      - name: Commit version bump
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json package-lock.json system.json
+          git commit -m "chore(release): v${{ steps.bump.outputs.version }}"
+          git tag "v${{ steps.bump.outputs.version }}"
+          git push origin HEAD:main
+          git push origin "v${{ steps.bump.outputs.version }}"
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "v${{ steps.bump.outputs.version }}" \
+            dist/system.json \
+            system.zip \
+            --title "v${{ steps.bump.outputs.version }}" \
+            --generate-notes

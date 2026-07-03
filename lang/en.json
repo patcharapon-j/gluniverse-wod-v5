@@ -1,0 +1,21 @@
+{
+  "GLUNIVERSE.SystemName": "GLUniverse — World of Darkness V5",
+  "GLUNIVERSE.Actor.mortal": "Mortal",
+  "GLUNIVERSE.Actor.vampire": "Vampire",
+  "GLUNIVERSE.Actor.hunter": "Hunter",
+  "GLUNIVERSE.Attributes.strength": "Strength",
+  "GLUNIVERSE.Attributes.dexterity": "Dexterity",
+  "GLUNIVERSE.Attributes.stamina": "Stamina",
+  "GLUNIVERSE.Attributes.charisma": "Charisma",
+  "GLUNIVERSE.Attributes.manipulation": "Manipulation",
+  "GLUNIVERSE.Attributes.composure": "Composure",
+  "GLUNIVERSE.Attributes.intelligence": "Intelligence",
+  "GLUNIVERSE.Attributes.wits": "Wits",
+  "GLUNIVERSE.Attributes.resolve": "Resolve",
+  "GLUNIVERSE.Health": "Health",
+  "GLUNIVERSE.Willpower": "Willpower",
+  "GLUNIVERSE.Hunger": "Hunger",
+  "GLUNIVERSE.Humanity": "Humanity",
+  "GLUNIVERSE.Desperation": "Desperation",
+  "GLUNIVERSE.Danger": "Danger"
+}
