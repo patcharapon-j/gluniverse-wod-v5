@@ -2,7 +2,7 @@
   "id": "gluniverse-wod-v5",
   "title": "GLUniverse — World of Darkness V5",
   "description": "A modern, unofficial Foundry VTT game system for the World of Darkness 5th Edition family of games (Vampire: The Masquerade, Hunter: The Reckoning, Werewolf, and more). Built as a single, shared foundation so every V5 splat can be played with one system.",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "compatibility": {
     "minimum": "13",
     "verified": "14"
@@ -33,7 +33,10 @@
       "path": "packs/disciplines",
       "type": "Item",
       "system": "gluniverse-wod-v5",
-      "ownership": { "PLAYER": "OBSERVER", "ASSISTANT": "OWNER" }
+      "ownership": {
+        "PLAYER": "OBSERVER",
+        "ASSISTANT": "OWNER"
+      }
     },
     {
       "name": "rituals",
@@ -41,7 +44,10 @@
       "path": "packs/rituals",
       "type": "Item",
       "system": "gluniverse-wod-v5",
-      "ownership": { "PLAYER": "OBSERVER", "ASSISTANT": "OWNER" }
+      "ownership": {
+        "PLAYER": "OBSERVER",
+        "ASSISTANT": "OWNER"
+      }
     },
     {
       "name": "ceremonies",
@@ -49,7 +55,10 @@
       "path": "packs/ceremonies",
       "type": "Item",
       "system": "gluniverse-wod-v5",
-      "ownership": { "PLAYER": "OBSERVER", "ASSISTANT": "OWNER" }
+      "ownership": {
+        "PLAYER": "OBSERVER",
+        "ASSISTANT": "OWNER"
+      }
     },
     {
       "name": "advantages",
@@ -57,7 +66,10 @@
       "path": "packs/advantages",
       "type": "Item",
       "system": "gluniverse-wod-v5",
-      "ownership": { "PLAYER": "OBSERVER", "ASSISTANT": "OWNER" }
+      "ownership": {
+        "PLAYER": "OBSERVER",
+        "ASSISTANT": "OWNER"
+      }
     },
     {
       "name": "equipment",
@@ -65,7 +77,10 @@
       "path": "packs/equipment",
       "type": "Item",
       "system": "gluniverse-wod-v5",
-      "ownership": { "PLAYER": "OBSERVER", "ASSISTANT": "OWNER" }
+      "ownership": {
+        "PLAYER": "OBSERVER",
+        "ASSISTANT": "OWNER"
+      }
     },
     {
       "name": "lore",
@@ -73,7 +88,10 @@
       "path": "packs/lore",
       "type": "JournalEntry",
       "system": "gluniverse-wod-v5",
-      "ownership": { "PLAYER": "OBSERVER", "ASSISTANT": "OWNER" }
+      "ownership": {
+        "PLAYER": "OBSERVER",
+        "ASSISTANT": "OWNER"
+      }
     }
   ],
   "packFolders": [
@@ -81,7 +99,14 @@
       "name": "Vampire: The Masquerade",
       "sorting": "m",
       "color": "#5a0a12",
-      "packs": ["disciplines", "rituals", "ceremonies", "advantages", "equipment", "lore"]
+      "packs": [
+        "disciplines",
+        "rituals",
+        "ceremonies",
+        "advantages",
+        "equipment",
+        "lore"
+      ]
     }
   ],
   "gridDistance": 1,
@@ -90,7 +115,7 @@
   "secondaryTokenAttribute": "willpower",
   "url": "https://github.com/patcharapon-j/gluniverse-wod-v5",
   "manifest": "https://github.com/patcharapon-j/gluniverse-wod-v5/releases/latest/download/system.json",
-  "download": "https://github.com/patcharapon-j/gluniverse-wod-v5/releases/download/v0.0.1/system.zip",
+  "download": "https://github.com/patcharapon-j/gluniverse-wod-v5/releases/download/v0.1.0/system.zip",
   "readme": "https://github.com/patcharapon-j/gluniverse-wod-v5/blob/main/README.md",
   "bugs": "https://github.com/patcharapon-j/gluniverse-wod-v5/issues",
   "license": "https://github.com/patcharapon-j/gluniverse-wod-v5/blob/main/LICENSE"
