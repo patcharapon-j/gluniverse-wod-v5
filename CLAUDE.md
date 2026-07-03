@@ -10,13 +10,20 @@ Hunter, Werewolf, etc.), built as one shared system covering every V5 splat.
 - `src/module/gluniverse-wod.ts` — system entry point (Foundry `init`/`ready` hooks).
 - `src/foundry-shim.d.ts` — minimal ambient types; replace with `foundry-vtt-types` when implementing.
 - `styles/`, `lang/` — CSS and localization, copied into the build as-is.
+- `src/packs-src/*.mjs` — compendium source content (compact, normalized docs via
+  `_helpers.mjs`). Descriptions are original summaries; only mechanical facts
+  (levels, costs, dice pools, amalgams) are reproduced — no rulebook prose.
+- `scripts/build-packs.mjs` — assigns stable ids and compiles `src/packs-src/`
+  into LevelDB packs under `dist/packs/` (Foundry CLI). Declared in `system.json`.
 - `scripts/update-manifest.mjs` — rewrites `system.json` URLs/version at release time.
 - `.github/workflows/release.yml` — manual-trigger release (patch/minor/major).
 
 ## Build
 
 `vite build` compiles `src/` and copies `system.json`, `template.json`, `lang/`,
-`styles/` into `dist/`, which is the root of the packaged `system.zip`.
+`styles/` into `dist/`; then `npm run build:packs` compiles the compendium
+content into `dist/packs/`. `npm run build` runs both. `dist/` is the root of the
+packaged `system.zip`.
 
 ## Releasing
 
