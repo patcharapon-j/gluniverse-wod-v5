@@ -153,10 +153,11 @@ export const Gear = (e) => ({
   },
 });
 
-/** A JournalEntry with one or more text pages. */
+/** A JournalEntry with one or more text pages (and optional system flags). */
 export const Journal = (e) => ({
   name: e.name,
   img: e.img,
+  flags: e.flags,
   pages: (e.pages ?? []).map((pg, i) => ({
     name: pg.name,
     type: "text",

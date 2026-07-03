@@ -12,7 +12,8 @@ import { registerChatActions } from "./dice/chat-actions.ts";
 import { registerSettings } from "./settings.ts";
 import { registerConditions } from "./conditions.ts";
 import { openRollDialog } from "./apps/RollDialogApp.ts";
-import { rouseCheck, remorseCheck, frenzyCheck } from "./dice/checks.ts";
+import { rouseCheck, remorseCheck } from "./dice/checks.ts";
+import { frenzyCheck } from "./dice/frenzy.ts";
 
 Hooks.once("init", () => {
   console.log(`${SYSTEM_ID} | Initializing GLUniverse — World of Darkness V5`);

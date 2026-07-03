@@ -9,8 +9,7 @@
 
 import { BLOOD_POTENCY } from "../config.ts";
 import { getSetting, SETTINGS } from "../settings.ts";
-import { postCheckCard, postRollCard } from "./chat.ts";
-import { rollPool } from "./roll-v5.ts";
+import { postCheckCard } from "./chat.ts";
 
 /** One die, 6+ succeeds. Blood Potency can let low-level Rouse checks re-roll. */
 export async function rouseCheck(
@@ -89,21 +88,6 @@ export async function remorseCheck(actor: any): Promise<boolean> {
     roll,
   });
   return success;
-}
-
-/**
- * Frenzy resistance: a standard V5 pool (Willpower dots, Hunger dice apply)
- * against a difficulty set by the provocation. Posted as a normal roll card so
- * the margin reads naturally.
- */
-export async function frenzyCheck(actor: any, difficulty = 3): Promise<void> {
-  const willpower = actor.system.willpower?.value ?? 0;
-  const hunger = actor.system.hunger ?? 0;
-  const { result, roll } = await rollPool({ pool: Math.max(1, willpower), hunger, difficulty });
-  await postRollCard(actor, result, roll, {
-    flavor: "Resist Frenzy",
-    won: result.won ? "The Beast is held." : "Frenzy takes hold.",
-  });
 }
 
 /** Blood Surge: extra dice equal to the Blood Potency surge bonus (costs a Rouse). */

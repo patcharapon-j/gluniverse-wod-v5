@@ -43,6 +43,8 @@ export interface V5RollResult {
   messy: boolean;
   bestial: boolean;
   outcome: V5Outcome;
+  /** True once a Willpower re-roll has been spent on this roll. */
+  willpowerUsed?: boolean;
 }
 
 /** Pure success/critical/messy/bestial evaluation over a set of dice. */
@@ -156,5 +158,7 @@ export async function willpowerReroll(
     dice[idx] = { value: fresh[k]!, hunger: false, rerolled: true };
   });
 
-  return { result: evaluate(dice, prev.difficulty), roll };
+  const result = evaluate(dice, prev.difficulty);
+  result.willpowerUsed = true;
+  return { result, roll };
 }

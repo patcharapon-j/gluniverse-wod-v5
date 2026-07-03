@@ -9,6 +9,23 @@
 
 import { Journal } from "./_helpers.mjs";
 
+const SYSTEM_ID = "gluniverse-wod-v5";
+
+/* Display name → config key, so a dropped lore entry can set the matching field. */
+const CLAN_KEY = {
+  Brujah: "brujah", Gangrel: "gangrel", Malkavian: "malkavian", Nosferatu: "nosferatu",
+  Toreador: "toreador", Tremere: "tremere", Ventrue: "ventrue", "Banu Haqim": "banuHaqim",
+  Hecata: "hecata", Lasombra: "lasombra", "The Ministry": "ministry", Ravnos: "ravnos",
+  Salubri: "salubri", Tzimisce: "tzimisce", Caitiff: "caitiff", "Thin-Blood": "thinBlood",
+};
+const PRED_KEY = {
+  "Alley Cat": "alleycat", Bagger: "bagger", "Blood Leech": "bloodLeech", Cleaver: "cleaver",
+  Consensualist: "consensualist", Farmer: "farmer", Osiris: "osiris", Sandman: "sandman",
+  "Scene Queen": "sceneQueen", Siren: "siren", Extortionist: "extortionist",
+  Graverobber: "graverobber", "Roadside Killer": "roadsideKiller", "Grim Reaper": "grimReaper",
+  Montero: "montero", Pursuer: "pursuer", Trapdoor: "trapdoor",
+};
+
 /* Build a clan journal page: original summary + a mechanical facts block. */
 function clan(name, summary, { disciplines, bane, compulsion }) {
   const content =
@@ -17,7 +34,8 @@ function clan(name, summary, { disciplines, bane, compulsion }) {
     `<p><strong>In-Clan Disciplines:</strong> ${disciplines.join(", ")}</p>` +
     `<p><strong>Bane:</strong> ${bane}</p>` +
     `<p><strong>Compulsion:</strong> ${compulsion}</p>`;
-  return Journal({ name, pages: [{ name, content }] });
+  const flags = CLAN_KEY[name] ? { [SYSTEM_ID]: { clanKey: CLAN_KEY[name] } } : undefined;
+  return Journal({ name, flags, pages: [{ name, content }] });
 }
 
 /* Build a predator-type journal page: original feeding style + benefit hooks. */
@@ -27,7 +45,8 @@ function predator(name, style, benefits) {
     `<hr/>` +
     `<p><strong>Typical Benefits:</strong></p>` +
     `<ul>${benefits.map((b) => `<li>${b}</li>`).join("")}</ul>`;
-  return Journal({ name: `Predator: ${name}`, pages: [{ name, content }] });
+  const flags = PRED_KEY[name] ? { [SYSTEM_ID]: { predatorKey: PRED_KEY[name] } } : undefined;
+  return Journal({ name: `Predator: ${name}`, flags, pages: [{ name, content }] });
 }
 
 const clans = [

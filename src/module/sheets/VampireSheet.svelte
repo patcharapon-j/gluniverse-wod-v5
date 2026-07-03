@@ -9,7 +9,8 @@
   import EffectsPanel from "../components/EffectsPanel.svelte";
   import { createItem, editItem, deleteItem } from "../apps/actor-items.ts";
   import { openRollDialog } from "../apps/RollDialogApp.ts";
-  import { rouseCheck, remorseCheck, frenzyCheck } from "../dice/checks.ts";
+  import { rouseCheck, remorseCheck } from "../dice/checks.ts";
+  import { frenzyCheck } from "../dice/frenzy.ts";
 
   /* eslint-disable @typescript-eslint/no-explicit-any */
   interface Props {

@@ -9,32 +9,64 @@
 import { SYSTEM_ID } from "../config.ts";
 import type { V5RollResult } from "./roll-v5.ts";
 import { willpowerReroll } from "./roll-v5.ts";
-import { rollCardHTML } from "./chat.ts";
+import { rollCardHTML, renderDiceTooltip } from "./chat.ts";
 
-async function onAction(message: any, button: HTMLElement): Promise<void> {
-  const action = button.dataset.glAction;
-  if (action !== "wp-reroll") return;
-
-  const flag = message.getFlag?.(SYSTEM_ID, "result") as V5RollResult | undefined;
-  if (!flag) return;
+/**
+ * Spend a Willpower re-roll on an existing card: re-roll the lowest regular dice,
+ * mark one Superficial Willpower on the actor, and rewrite the *same* message so
+ * there is no duplicate card and no second re-roll is offered.
+ */
+async function onWillpowerReroll(message: any, button: HTMLElement): Promise<void> {
+  const flags = message.getFlag?.(SYSTEM_ID) ?? {};
+  const prev = flags.result as V5RollResult | undefined;
+  if (!prev || prev.willpowerUsed) return;
   button.setAttribute("disabled", "true");
 
-  const redo = await willpowerReroll(flag);
+  const redo = await willpowerReroll(prev);
   if (!redo) return;
 
-  const actorUuid = message.getFlag(SYSTEM_ID, "actorUuid") as string | undefined;
+  const actorUuid = flags.actorUuid as string | undefined;
   const actor = actorUuid ? await fromUuid(actorUuid) : null;
-  const name = actor?.name ?? message.alias ?? "—";
-  const content = rollCardHTML(name, redo.result, "Willpower Re-roll");
+  await markWillpowerCost(actor);
 
-  await ChatMessage.create({
-    speaker: message.speaker,
-    content,
-    rolls: [redo.roll],
-    flags: {
-      [SYSTEM_ID]: { card: "roll", result: redo.result, actorUuid, rerollOf: message.id },
-    },
+  const rerolled = redo.result.dice
+    .map((d, i) => (d.rerolled ? i + 1 : 0))
+    .filter(Boolean);
+  const note = `Willpower re-roll — 1 Superficial Willpower spent; re-rolled ${rerolled.length} ${rerolled.length === 1 ? "die" : "dice"}.`;
+
+  const diceTooltip = await renderDiceTooltip(redo.roll);
+  const content = rollCardHTML({
+    actorName: (flags.actorName as string) ?? actor?.name ?? message.alias ?? "—",
+    img: flags.img as string | undefined,
+    result: redo.result,
+    flavor: (flags.flavor as string) ?? "Roll",
+    diceTooltip,
+    bloodSurge: !!flags.bloodSurge,
+    note,
   });
+
+  // Edit the original message in place; append the re-roll's dice to its rolls.
+  const rolls = [...(message.rolls ?? []), redo.roll];
+  await message.update({
+    content,
+    rolls,
+    [`flags.${SYSTEM_ID}.result`]: redo.result,
+  });
+}
+
+/** Mark one Superficial Willpower on a track-based actor (no-op otherwise). */
+async function markWillpowerCost(actor: any): Promise<void> {
+  const wp = actor?.system?.willpower;
+  if (!wp || typeof wp !== "object") return;
+  const max = wp.max ?? 0;
+  const superficial = wp.superficial ?? 0;
+  const aggravated = wp.aggravated ?? 0;
+  if (superficial + aggravated >= max) return; // track already full
+  await actor.update({ "system.willpower.superficial": superficial + 1 });
+}
+
+async function onAction(message: any, button: HTMLElement): Promise<void> {
+  if (button.dataset.glAction === "wp-reroll") await onWillpowerReroll(message, button);
 }
 
 function bind(message: any, root: HTMLElement): void {
