@@ -2,7 +2,7 @@
   "id": "gluniverse-wod-v5",
   "title": "GLUniverse — World of Darkness V5",
   "description": "A modern, unofficial Foundry VTT game system for the World of Darkness 5th Edition family of games (Vampire: The Masquerade, Hunter: The Reckoning, Werewolf, and more). Built as a single, shared foundation so every V5 splat can be played with one system.",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "compatibility": {
     "minimum": "13",
     "verified": "14"
@@ -33,7 +33,7 @@
   "secondaryTokenAttribute": "willpower",
   "url": "https://github.com/patcharapon-j/gluniverse-wod-v5",
   "manifest": "https://github.com/patcharapon-j/gluniverse-wod-v5/releases/latest/download/system.json",
-  "download": "https://github.com/patcharapon-j/gluniverse-wod-v5/releases/download/v0.0.0/system.zip",
+  "download": "https://github.com/patcharapon-j/gluniverse-wod-v5/releases/download/v0.0.1/system.zip",
   "readme": "https://github.com/patcharapon-j/gluniverse-wod-v5/blob/main/README.md",
   "bugs": "https://github.com/patcharapon-j/gluniverse-wod-v5/issues",
   "license": "https://github.com/patcharapon-j/gluniverse-wod-v5/blob/main/LICENSE"
