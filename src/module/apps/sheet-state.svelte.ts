@@ -19,11 +19,20 @@ export interface ItemSnapshot {
   system: any;
 }
 
+export interface EffectSnapshot {
+  id: string;
+  name: string;
+  img: string;
+  disabled: boolean;
+  changes: { key: string; mode: number; value: string }[];
+}
+
 export class SheetState {
   name = $state("");
   img = $state("");
   system = $state<any>({});
   items = $state<ItemSnapshot[]>([]);
+  effects = $state<EffectSnapshot[]>([]);
   /** Bumped on every sync so components can force-depend on freshness. */
   rev = $state(0);
 
@@ -46,6 +55,19 @@ export class SheetState {
             system: foundry.utils.deepClone(i.system),
           }))
           .sort((a, b) => a.sort - b.sort)
+      : [];
+    this.effects = doc.effects
+      ? [...doc.effects].map((e: any) => ({
+          id: e.id,
+          name: e.name,
+          img: e.img ?? e.icon ?? "icons/svg/aura.svg",
+          disabled: !!e.disabled,
+          changes: (e.changes ?? []).map((c: any) => ({
+            key: c.key,
+            mode: c.mode,
+            value: String(c.value ?? ""),
+          })),
+        }))
       : [];
     this.rev++;
   }

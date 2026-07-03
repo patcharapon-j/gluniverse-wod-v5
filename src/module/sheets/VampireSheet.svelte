@@ -6,6 +6,7 @@
   import AttributeGrid from "../components/AttributeGrid.svelte";
   import SkillGrid from "../components/SkillGrid.svelte";
   import ItemControls from "../components/ItemControls.svelte";
+  import EffectsPanel from "../components/EffectsPanel.svelte";
   import { createItem, editItem, deleteItem } from "../apps/actor-items.ts";
   import { openRollDialog } from "../apps/RollDialogApp.ts";
   import { rouseCheck, remorseCheck, frenzyCheck } from "../dice/checks.ts";
@@ -458,9 +459,17 @@
       </label>
     </section>
   </div>
+
+  <div class="effects-wrap">
+    <EffectsPanel {doc} {snap} />
+  </div>
 </div>
 
 <style>
+  .effects-wrap {
+    padding: 18px 30px 26px;
+    border-top: 1px solid var(--gl-line);
+  }
   .gl-vampire {
     width: 960px;
     max-width: 100%;

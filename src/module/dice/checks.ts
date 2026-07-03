@@ -8,6 +8,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { BLOOD_POTENCY } from "../config.ts";
+import { getSetting, SETTINGS } from "../settings.ts";
 import { postCheckCard, postRollCard } from "./chat.ts";
 import { rollPool } from "./roll-v5.ts";
 
@@ -21,7 +22,8 @@ export async function rouseCheck(
   const best = Math.max(...dice);
   const success = best >= 6;
 
-  if (!success) {
+  const automate = getSetting(SETTINGS.automateHunger, true);
+  if (!success && automate) {
     const cur = actor.system.hunger ?? 0;
     if (cur < 5) await actor.update({ "system.hunger": cur + 1 });
   }
@@ -33,7 +35,9 @@ export async function rouseCheck(
     dice,
     detail: success
       ? "The Blood answers — no Hunger gained."
-      : "Hunger rises by 1.",
+      : automate
+        ? "Hunger rises by 1."
+        : "The Blood resists — raise Hunger by 1.",
     roll,
   });
   return success;
@@ -58,13 +62,16 @@ export async function remorseCheck(actor: any): Promise<boolean> {
   const dice: number[] = roll.dice[0].results.map((r: any) => r.result);
   const success = dice.some((d) => d >= 6);
 
-  if (success) {
-    await actor.update({ "system.humanity.stains": 0 });
-  } else {
-    await actor.update({
-      "system.humanity.value": Math.max(0, humanity - 1),
-      "system.humanity.stains": 0,
-    });
+  const automate = getSetting(SETTINGS.automateRemorse, true);
+  if (automate) {
+    if (success) {
+      await actor.update({ "system.humanity.stains": 0 });
+    } else {
+      await actor.update({
+        "system.humanity.value": Math.max(0, humanity - 1),
+        "system.humanity.stains": 0,
+      });
+    }
   }
 
   await postCheckCard(actor, {
@@ -73,8 +80,12 @@ export async function remorseCheck(actor: any): Promise<boolean> {
     success,
     dice,
     detail: success
-      ? "Remorse takes hold — stains wash away, Humanity holds."
-      : "The Beast wins — Humanity falls by 1.",
+      ? automate
+        ? "Remorse takes hold — stains wash away, Humanity holds."
+        : "Remorse takes hold — clear the stains; Humanity holds."
+      : automate
+        ? "The Beast wins — Humanity falls by 1."
+        : "The Beast wins — lower Humanity by 1 and clear the stains.",
     roll,
   });
   return success;

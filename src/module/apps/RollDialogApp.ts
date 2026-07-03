@@ -12,6 +12,7 @@ import RollDialog from "../sheets/RollDialog.svelte";
 import { rollPool } from "../dice/roll-v5.ts";
 import { postRollCard, rollCardHTML } from "../dice/chat.ts";
 import { rouseCheck, bloodSurgeBonus } from "../dice/checks.ts";
+import { getSetting, SETTINGS } from "../settings.ts";
 
 export interface RollSeed {
   attribute?: string;
@@ -37,7 +38,8 @@ export class RollDialogApp extends AppV2 {
   constructor(actor: any, seed: RollSeed = {}, options: Record<string, unknown> = {}) {
     super(options);
     this._actor = actor;
-    this._seed = seed;
+    // Seed an unset difficulty from the client's preferred default.
+    this._seed = { difficulty: getSetting(SETTINGS.defaultDifficulty, 2), ...seed };
   }
 
   async _renderHTML(): Promise<null> {

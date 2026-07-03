@@ -26,7 +26,64 @@
       "path": "lang/en.json"
     }
   ],
-  "packs": [],
+  "packs": [
+    {
+      "name": "disciplines",
+      "label": "Disciplines & Powers",
+      "path": "packs/disciplines",
+      "type": "Item",
+      "system": "gluniverse-wod-v5",
+      "ownership": { "PLAYER": "OBSERVER", "ASSISTANT": "OWNER" }
+    },
+    {
+      "name": "rituals",
+      "label": "Blood Sorcery Rituals",
+      "path": "packs/rituals",
+      "type": "Item",
+      "system": "gluniverse-wod-v5",
+      "ownership": { "PLAYER": "OBSERVER", "ASSISTANT": "OWNER" }
+    },
+    {
+      "name": "ceremonies",
+      "label": "Oblivion Ceremonies",
+      "path": "packs/ceremonies",
+      "type": "Item",
+      "system": "gluniverse-wod-v5",
+      "ownership": { "PLAYER": "OBSERVER", "ASSISTANT": "OWNER" }
+    },
+    {
+      "name": "advantages",
+      "label": "Advantages",
+      "path": "packs/advantages",
+      "type": "Item",
+      "system": "gluniverse-wod-v5",
+      "ownership": { "PLAYER": "OBSERVER", "ASSISTANT": "OWNER" }
+    },
+    {
+      "name": "equipment",
+      "label": "Equipment",
+      "path": "packs/equipment",
+      "type": "Item",
+      "system": "gluniverse-wod-v5",
+      "ownership": { "PLAYER": "OBSERVER", "ASSISTANT": "OWNER" }
+    },
+    {
+      "name": "lore",
+      "label": "Clans & Predator Types",
+      "path": "packs/lore",
+      "type": "JournalEntry",
+      "system": "gluniverse-wod-v5",
+      "ownership": { "PLAYER": "OBSERVER", "ASSISTANT": "OWNER" }
+    }
+  ],
+  "packFolders": [
+    {
+      "name": "Vampire: The Masquerade",
+      "sorting": "m",
+      "color": "#5a0a12",
+      "packs": ["disciplines", "rituals", "ceremonies", "advantages", "equipment", "lore"]
+    }
+  ],
   "gridDistance": 1,
   "gridUnits": "m",
   "primaryTokenAttribute": "health",
