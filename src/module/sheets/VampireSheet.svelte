@@ -1,8 +1,10 @@
 <script lang="ts">
-  import { ATTRIBUTES, SKILLS, CLANS, PREDATOR_TYPES, RESONANCES, RESONANCE_INTENSITIES } from "../config.ts";
-  import { label, prettify } from "../components/labels.ts";
+  import { CLANS, PREDATOR_TYPES, RESONANCES, RESONANCE_INTENSITIES } from "../config.ts";
+  import { prettify } from "../components/labels.ts";
   import DotRating from "../components/DotRating.svelte";
   import DamageTrack from "../components/DamageTrack.svelte";
+  import AttributeGrid from "../components/AttributeGrid.svelte";
+  import SkillGrid from "../components/SkillGrid.svelte";
   import ItemControls from "../components/ItemControls.svelte";
   import { createItem, editItem, deleteItem } from "../apps/actor-items.ts";
   import { openRollDialog } from "../apps/RollDialogApp.ts";
@@ -31,7 +33,6 @@
 
   // --- local UI state -------------------------------------------------------
   let collapsed: Record<string, boolean> = $state({});
-  let editingSpec: string | null = $state(null);
   let dragOver = $state(false);
 
   const toggle = (key: string) => (collapsed[key] = !collapsed[key]);
@@ -51,16 +52,6 @@
   }
   function setHumanity(i: number) {
     up("system.humanity.value", sys.humanity.value === i + 1 ? i : i + 1);
-  }
-
-  // --- specialties ----------------------------------------------------------
-  function specText(k: string): string {
-    return (sys.skills[k].specialties ?? []).join(", ");
-  }
-  function saveSpec(k: string, raw: string) {
-    const list = raw.split(",").map((s) => s.trim()).filter(Boolean);
-    up(`system.skills.${k}.specialties`, list);
-    editingSpec = null;
   }
 
   // --- convictions ----------------------------------------------------------
@@ -158,68 +149,19 @@
   <div class="body">
     <section class="left">
       <div class="sect-h">Attributes</div>
-      <div class="triad">
-        {#each Object.entries(ATTRIBUTES) as [cat, keys] (cat)}
-          <div class="col">
-            <div class="col-h">{prettify(cat)}</div>
-            {#each keys as k (k)}
-              <div class="row">
-                <button class="at-name roll-trait" title="Roll {label('Attributes', k)}" onclick={() => rollAttr(k)}>{label("Attributes", k)}</button>
-                <DotRating
-                  value={sys.attributes[k].value}
-                  onchange={(n) => up(`system.attributes.${k}.value`, n)}
-                />
-              </div>
-            {/each}
-          </div>
-        {/each}
-      </div>
+      <AttributeGrid
+        attributes={sys.attributes}
+        onrate={(k, n) => up(`system.attributes.${k}.value`, n)}
+        onroll={rollAttr}
+      />
 
       <div class="sect-h">Skills</div>
-      <div class="triad">
-        {#each Object.entries(SKILLS) as [cat, keys] (cat)}
-          <div class="col">
-            <div class="col-h">{prettify(cat)}</div>
-            {#each keys as k (k)}
-              {@const spec = specText(k)}
-              <div class="sk-block gl-hoverable">
-                <div class="row">
-                  <span class="sk-left">
-                    <button
-                      class="sk-name roll-trait"
-                      class:has-spec={spec}
-                      title="Roll {label('Skills', k)}"
-                      onclick={() => rollSkill(k)}
-                    >{label("Skills", k)}</button>
-                    <button
-                      class="spec-edit"
-                      title="Edit specialties"
-                      aria-label="Edit specialties"
-                      onclick={() => (editingSpec = editingSpec === k ? null : k)}
-                    >✎</button>
-                  </span>
-                  <DotRating
-                    value={sys.skills[k].value}
-                    size={11}
-                    onchange={(n) => up(`system.skills.${k}.value`, n)}
-                  />
-                </div>
-                {#if editingSpec === k}
-                  <input
-                    class="spec-in"
-                    placeholder="Specialties, comma separated"
-                    value={spec}
-                    onchange={(e) => saveSpec(k, e.currentTarget.value)}
-                    onkeydown={(e) => e.key === "Enter" && saveSpec(k, e.currentTarget.value)}
-                  />
-                {:else if spec}
-                  <div class="spec-note">{spec}</div>
-                {/if}
-              </div>
-            {/each}
-          </div>
-        {/each}
-      </div>
+      <SkillGrid
+        skills={sys.skills}
+        onrate={(k, n) => up(`system.skills.${k}.value`, n)}
+        onspec={(k, list) => up(`system.skills.${k}.specialties`, list)}
+        onroll={rollSkill}
+      />
     </section>
 
     <aside class="rail">
@@ -693,45 +635,6 @@
     border-color: var(--gl-blood);
     background: color-mix(in srgb, var(--gl-blood) 8%, transparent);
   }
-  .triad {
-    display: grid;
-    grid-template-columns: 1fr 1fr 1fr;
-    gap: 26px;
-    margin-bottom: 30px;
-  }
-  .col-h {
-    font-family: var(--gl-cond);
-    text-transform: uppercase;
-    letter-spacing: 2px;
-    font-size: 10px;
-    text-align: center;
-    color: var(--gl-muted);
-    margin-bottom: 10px;
-  }
-  .row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 8px;
-  }
-  .at-name {
-    font-family: var(--gl-semi);
-    font-weight: 500;
-    font-size: 14px;
-  }
-  .roll-trait {
-    background: transparent;
-    border: none;
-    padding: 0;
-    color: var(--gl-ink);
-    cursor: pointer;
-    text-align: left;
-    border-bottom: 1px solid transparent;
-  }
-  .roll-trait:hover {
-    color: var(--gl-blood);
-    border-bottom-color: var(--gl-blood);
-  }
   .roll-cta {
     align-self: center;
     font-family: var(--gl-cond);
@@ -746,28 +649,6 @@
   }
   .roll-cta:hover {
     background: var(--gl-blood-bright);
-  }
-  .sk-left {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-  }
-  .spec-edit {
-    background: transparent;
-    border: none;
-    color: var(--gl-muted);
-    cursor: pointer;
-    font-size: 11px;
-    padding: 0 2px;
-    opacity: 0;
-    transition: opacity 0.12s;
-  }
-  .gl-hoverable:hover .spec-edit,
-  .spec-edit:focus-visible {
-    opacity: 1;
-  }
-  .spec-edit:hover {
-    color: var(--gl-blood);
   }
   .chk-btn {
     font-family: var(--gl-cond);
@@ -785,44 +666,6 @@
     border-color: var(--gl-blood);
     background: color-mix(in srgb, var(--gl-blood) 8%, transparent);
   }
-  .sk-block {
-    margin-bottom: 6px;
-  }
-  .sk-block .row {
-    margin-bottom: 2px;
-  }
-  .sk-name {
-    font-family: var(--gl-semi);
-    font-weight: 500;
-    font-size: 13px;
-    background: transparent;
-    border: none;
-    padding: 0;
-    color: var(--gl-ink);
-    cursor: pointer;
-    text-align: left;
-  }
-  .sk-name:hover {
-    color: var(--gl-blood);
-  }
-  .sk-name.has-spec {
-    color: var(--gl-blood);
-  }
-  .spec-in {
-    width: 100%;
-    font-size: 11px;
-    border: 1px solid var(--gl-line);
-    background: var(--gl-parch-raise);
-    padding: 2px 5px;
-    margin-top: 2px;
-  }
-  .spec-note {
-    font-size: 10px;
-    color: var(--gl-muted-2);
-    font-style: italic;
-    padding-left: 2px;
-  }
-
   /* rail */
   .rail {
     padding: 26px 24px;

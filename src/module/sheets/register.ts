@@ -5,14 +5,18 @@
 import { SYSTEM_ID, ITEM_TYPES } from "../config.ts";
 import { makeActorSheet, makeItemSheet } from "../apps/svelte-sheets.ts";
 import VampireSheet from "./VampireSheet.svelte";
-import ActorPlaceholder from "./ActorPlaceholder.svelte";
+import MortalSheet from "./MortalSheet.svelte";
+import SpcSheet from "./SpcSheet.svelte";
+import CoterieSheet from "./CoterieSheet.svelte";
 import ItemSheet from "./ItemSheet.svelte";
 
 export function registerSheets(): void {
   const DocumentSheetConfig = foundry.applications.apps.DocumentSheetConfig;
 
   const VampireApp = makeActorSheet(VampireSheet, { width: 1000, height: 940 });
-  const PlaceholderApp = makeActorSheet(ActorPlaceholder, { width: 720, height: 520 });
+  const MortalApp = makeActorSheet(MortalSheet, { width: 1000, height: 820 });
+  const SpcApp = makeActorSheet(SpcSheet, { width: 760, height: 720 });
+  const CoterieApp = makeActorSheet(CoterieSheet, { width: 800, height: 700 });
   const ItemApp = makeItemSheet(ItemSheet, { width: 520, height: 620 });
 
   DocumentSheetConfig.registerSheet(Actor, SYSTEM_ID, VampireApp, {
@@ -20,10 +24,20 @@ export function registerSheets(): void {
     makeDefault: true,
     label: "GLUniverse — Vampire",
   });
-  DocumentSheetConfig.registerSheet(Actor, SYSTEM_ID, PlaceholderApp, {
-    types: ["mortal", "ghoul", "spc", "coterie"],
+  DocumentSheetConfig.registerSheet(Actor, SYSTEM_ID, MortalApp, {
+    types: ["mortal", "ghoul"],
     makeDefault: true,
-    label: "GLUniverse — Actor",
+    label: "GLUniverse — Mortal / Ghoul",
+  });
+  DocumentSheetConfig.registerSheet(Actor, SYSTEM_ID, SpcApp, {
+    types: ["spc"],
+    makeDefault: true,
+    label: "GLUniverse — Antagonist",
+  });
+  DocumentSheetConfig.registerSheet(Actor, SYSTEM_ID, CoterieApp, {
+    types: ["coterie"],
+    makeDefault: true,
+    label: "GLUniverse — Coterie",
   });
   DocumentSheetConfig.registerSheet(Item, SYSTEM_ID, ItemApp, {
     types: [...ITEM_TYPES],
