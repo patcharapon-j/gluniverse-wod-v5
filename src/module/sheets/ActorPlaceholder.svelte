@@ -4,15 +4,15 @@
   /* eslint-disable @typescript-eslint/no-explicit-any */
   interface Props {
     doc: any;
-    state: any;
+    snap: any;
     app: any;
   }
-  let { doc, state }: Props = $props();
+  let { doc, snap }: Props = $props();
 </script>
 
 <div class="ph">
   <div class="eyebrow">{prettify(doc.type)} · GLUniverse</div>
-  <input class="name" value={state.name} onchange={(e) => doc.update({ name: e.currentTarget.value })} />
+  <input class="name" value={snap.name} onchange={(e) => doc.update({ name: e.currentTarget.value })} />
   <p class="note">
     A dedicated <b>{prettify(doc.type)}</b> sheet is on the way. Core data is already stored and editable
     from the token / prototype data until then.

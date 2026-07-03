@@ -10,6 +10,7 @@
 
 import { mount, unmount, type Component } from "svelte";
 import { SheetState } from "./sheet-state.svelte.ts";
+import { handleActorDrop } from "./actor-items.ts";
 
 interface SvelteSheetOptions {
   width?: number;
@@ -48,8 +49,14 @@ function svelteSheetMixin(Base: any, component: Component<any>, opts: SvelteShee
       this._gl_state = new SheetState(this.document);
       this._gl_svelte = mount(component, {
         target,
-        props: { doc: this.document, state: this._gl_state, app: this },
+        props: { doc: this.document, snap: this._gl_state, app: this },
       });
+    }
+
+    /** Drop handler the Svelte root binds to; actor sheets accept items. */
+    async glHandleDrop(event: DragEvent): Promise<boolean> {
+      if (this.document?.documentName !== "Actor") return false;
+      return handleActorDrop(this.document, event);
     }
 
     async _onClose(options: unknown): Promise<void> {

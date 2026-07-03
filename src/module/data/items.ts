@@ -32,6 +32,10 @@ export class PowerData extends (foundry.abstract.TypeDataModel as any) {
     return {
       ...describable(),
       discipline: str("", { choices: [...DISCIPLINES] }),
+      // Id of the owning Discipline item on the actor, so powers nest under the
+      // right instance (an actor can own the same discipline only once, but this
+      // keeps the link explicit and drag-drop friendly).
+      parentDiscipline: str(),
       level: int(1, { min: 1, max: 5 }),
       cost: str(), // e.g. "One Rouse Check"
       pool: str(), // dice pool string, e.g. "Charisma + Presence"
