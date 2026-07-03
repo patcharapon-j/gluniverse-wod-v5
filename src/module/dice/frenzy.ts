@@ -73,3 +73,37 @@ export async function frenzyCheck(actor: any, opts: FrenzyOptions = {}): Promise
   });
   return held;
 }
+
+/**
+ * Prompt for the provocation (which decides the Beast's face and the default
+ * difficulty), then run the check. Falls back to a straight fury check if the
+ * DialogV2 API is unavailable.
+ */
+export async function openFrenzyDialog(actor: any): Promise<void> {
+  const DialogV2 = (foundry as any).applications?.api?.DialogV2;
+  if (!DialogV2?.wait) {
+    await frenzyCheck(actor);
+    return;
+  }
+  const content = `
+    <p style="margin:.2em 0 .6em">Choose the provocation. Difficulty defaults to the trigger — edit it for the scene.</p>
+    <label style="display:flex;gap:.5em;align-items:center">Difficulty
+      <input name="gl-diff" type="number" min="1" max="9" placeholder="(default)" style="width:5em"/>
+    </label>`;
+  const buttons = FRENZY_TRIGGERS.map((t) => ({
+    action: t.key,
+    label: t.label,
+    callback: (_ev: any, _btn: any, dialog: any) => {
+      const raw = dialog?.element?.querySelector?.("[name='gl-diff']")?.value;
+      const diff = Number(raw);
+      return { trigger: t.key, difficulty: Number.isFinite(diff) && diff > 0 ? diff : t.difficulty };
+    },
+  }));
+  const res = await DialogV2.wait({
+    window: { title: "Resist Frenzy" },
+    content,
+    buttons,
+    rejectClose: false,
+  });
+  if (res) await frenzyCheck(actor, res as FrenzyOptions);
+}

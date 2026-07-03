@@ -9,8 +9,9 @@
     onrate: (key: string, n: number) => void;
     onspec: (key: string, list: string[]) => void;
     onroll?: (key: string) => void;
+    readonly?: boolean;
   }
-  let { skills, onrate, onspec, onroll }: Props = $props();
+  let { skills, onrate, onspec, onroll, readonly = false }: Props = $props();
 
   let editing: string | null = $state(null);
 
@@ -35,9 +36,11 @@
               {:else}
                 <span class="sk-name" class:has-spec={spec}>{label("Skills", k)}</span>
               {/if}
-              <button class="spec-edit" title="Edit specialties" aria-label="Edit specialties" onclick={() => (editing = editing === k ? null : k)}>✎</button>
+              {#if !readonly}
+                <button class="spec-edit" title="Edit specialties" aria-label="Edit specialties" onclick={() => (editing = editing === k ? null : k)}>✎</button>
+              {/if}
             </span>
-            <DotRating value={skills[k].value} size={11} onchange={(n) => onrate(k, n)} />
+            <DotRating value={skills[k].value} size={13} {readonly} onchange={(n) => onrate(k, n)} />
           </div>
           {#if editing === k}
             <input
@@ -60,8 +63,8 @@
   .triad {
     display: grid;
     grid-template-columns: 1fr 1fr 1fr;
-    gap: 26px;
-    margin-bottom: 30px;
+    gap: 12px 20px;
+    margin-bottom: 16px;
   }
   .col-h {
     font-family: var(--gl-cond);
@@ -70,7 +73,7 @@
     font-size: 10px;
     text-align: center;
     color: var(--gl-muted);
-    margin-bottom: 10px;
+    margin-bottom: 7px;
   }
   .row {
     display: flex;
@@ -78,10 +81,10 @@
     justify-content: space-between;
   }
   .sk-block {
-    margin-bottom: 6px;
+    margin-bottom: 3px;
   }
   .sk-block .row {
-    margin-bottom: 2px;
+    margin-bottom: 1px;
   }
   .sk-left {
     display: inline-flex;

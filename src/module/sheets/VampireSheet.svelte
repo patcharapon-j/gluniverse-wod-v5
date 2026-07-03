@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { CLANS, PREDATOR_TYPES, RESONANCES, RESONANCE_INTENSITIES } from "../config.ts";
+  import { CLANS, PREDATOR_TYPES, RESONANCES, RESONANCE_INTENSITIES, BLOOD_POTENCY } from "../config.ts";
   import { prettify } from "../components/labels.ts";
   import DotRating from "../components/DotRating.svelte";
   import DamageTrack from "../components/DamageTrack.svelte";
@@ -7,10 +7,14 @@
   import SkillGrid from "../components/SkillGrid.svelte";
   import ItemControls from "../components/ItemControls.svelte";
   import EffectsPanel from "../components/EffectsPanel.svelte";
+  import Portrait from "../components/Portrait.svelte";
   import { createItem, editItem, deleteItem } from "../apps/actor-items.ts";
-  import { openRollDialog } from "../apps/RollDialogApp.ts";
+  import { openRollDialog, rollPower, rollDiscipline } from "../apps/RollDialogApp.ts";
+  import { openXpDialog } from "../apps/XpDialogApp.ts";
+  import { pickImage } from "../apps/image.ts";
   import { rouseCheck, remorseCheck } from "../dice/checks.ts";
-  import { frenzyCheck } from "../dice/frenzy.ts";
+  import { openFrenzyDialog } from "../dice/frenzy.ts";
+  import { clanBane, clanCompulsion } from "../vtm/clans.ts";
 
   /* eslint-disable @typescript-eslint/no-explicit-any */
   interface Props {
@@ -24,7 +28,6 @@
   const items = $derived(snap.items as any[]);
 
   const disciplines = $derived(items.filter((i) => i.type === "discipline"));
-  const advantages = $derived(items.filter((i) => i.type === "advantage"));
   const rituals = $derived(items.filter((i) => i.type === "ritual"));
   const ceremonies = $derived(items.filter((i) => i.type === "ceremony"));
   const weapons = $derived(items.filter((i) => i.type === "weapon"));
@@ -33,11 +36,29 @@
   const powersFor = (id: string) =>
     items.filter((i) => i.type === "power" && i.system.parentDiscipline === id);
 
+  // Advantages grouped by kind so backgrounds read differently from merits/flaws.
+  const ADV_GROUPS = [
+    { kind: "background", label: "Backgrounds" },
+    { kind: "merit", label: "Merits" },
+    { kind: "flaw", label: "Flaws" },
+    { kind: "loresheet", label: "Loresheets" },
+  ] as const;
+  const advOf = (kind: string) =>
+    items.filter((i) => i.type === "advantage" && (i.system.kind ?? "merit") === kind);
+
+  // Clan bane / compulsion, scaled by Bane Severity from Blood Potency.
+  const baneSeverity = $derived(BLOOD_POTENCY[Math.max(0, Math.min(10, sys.bloodPotency ?? 0))]?.bane ?? 0);
+  const bane = $derived(sys.clan ? clanBane(sys.clan) : "");
+  const compulsion = $derived(sys.clan ? clanCompulsion(sys.clan) : "");
+
   // --- local UI state -------------------------------------------------------
   let collapsed: Record<string, boolean> = $state({});
+  let expanded: Record<string, boolean> = $state({});
+  let editMode = $state(false);
   let dragOver = $state(false);
 
   const toggle = (key: string) => (collapsed[key] = !collapsed[key]);
+  const reveal = (key: string) => (expanded[key] = !expanded[key]);
 
   // --- document edits -------------------------------------------------------
   function up(path: string, value: unknown) {
@@ -58,8 +79,7 @@
 
   // --- convictions ----------------------------------------------------------
   function addConviction() {
-    const list = [...(sys.convictions ?? []), { conviction: "", touchstone: "" }];
-    up("system.convictions", list);
+    up("system.convictions", [...(sys.convictions ?? []), { conviction: "", touchstone: "" }]);
   }
   function updateConviction(i: number, field: "conviction" | "touchstone", value: string) {
     const list = (sys.convictions ?? []).map((c: any, idx: number) =>
@@ -68,8 +88,7 @@
     up("system.convictions", list);
   }
   function removeConviction(i: number) {
-    const list = (sys.convictions ?? []).filter((_: any, idx: number) => idx !== i);
-    up("system.convictions", list);
+    up("system.convictions", (sys.convictions ?? []).filter((_: any, idx: number) => idx !== i));
   }
 
   // --- drag & drop ----------------------------------------------------------
@@ -87,6 +106,7 @@
 <div
   class="gl-vampire"
   class:dragover={dragOver}
+  class:play={!editMode}
   role="region"
   aria-label="Vampire character sheet"
   ondragover={(e) => (e.preventDefault(), (dragOver = true))}
@@ -96,70 +116,74 @@
   <!-- header -->
   <header class="hdr">
     <div class="spine"></div>
-    <div class="hdr-top">
-      <div class="idblock">
-        <div class="eyebrow">Kindred · Player Character</div>
-        <input
-          class="name"
-          value={snap.name}
-          onchange={(e) => doc.update({ name: e.currentTarget.value })}
-        />
+    <Portrait img={snap.img} name={snap.name} editable={editMode} onedit={() => pickImage(doc)} />
+    <div class="hdr-main">
+      <div class="hdr-top">
+        <div class="idblock">
+          <div class="eyebrow">Kindred · Player Character</div>
+          <input
+            class="name"
+            value={snap.name}
+            disabled={!editMode}
+            onchange={(e) => doc.update({ name: e.currentTarget.value })}
+          />
+        </div>
+        <div class="hdr-tools">
+          <button class="mode-toggle" class:on={editMode} onclick={() => (editMode = !editMode)} title="Toggle play / edit">
+            {editMode ? "🔓 Edit" : "🔒 Play"}
+          </button>
+          <button class="tool-btn" onclick={() => openXpDialog(doc)} title="Spend experience">Spend XP</button>
+          <button class="roll-cta" onclick={openPool} title="Build a dice pool">Roll Pool</button>
+        </div>
       </div>
-      <button class="roll-cta" onclick={openPool} title="Build a dice pool">Roll Pool</button>
       <div class="facts">
         <label class="fact">
           <span class="fk">Clan</span>
-          <select value={sys.clan} onchange={(e) => up("system.clan", e.currentTarget.value)}>
+          <select value={sys.clan} disabled={!editMode} onchange={(e) => up("system.clan", e.currentTarget.value)}>
             <option value="">—</option>
             {#each CLANS as c (c)}<option value={c}>{prettify(c)}</option>{/each}
           </select>
         </label>
         <label class="fact">
           <span class="fk">Generation</span>
-          <input
-            class="fv-in"
-            type="number"
-            min="3"
-            max="16"
-            value={sys.generation}
-            onchange={(e) => up("system.generation", Number(e.currentTarget.value))}
-          />
+          <input class="fv-in" type="number" min="3" max="16" value={sys.generation} disabled={!editMode} onchange={(e) => up("system.generation", Number(e.currentTarget.value))} />
         </label>
         <label class="fact">
           <span class="fk">Predator</span>
-          <select value={sys.predator} onchange={(e) => up("system.predator", e.currentTarget.value)}>
+          <select value={sys.predator} disabled={!editMode} onchange={(e) => up("system.predator", e.currentTarget.value)}>
             <option value="">—</option>
             {#each PREDATOR_TYPES as p (p)}<option value={p}>{prettify(p)}</option>{/each}
           </select>
         </label>
       </div>
-    </div>
-    <div class="hdr-sub">
-      {#each [["sire", "Sire"], ["details.ambition", "Ambition"], ["details.desire", "Desire"]] as const as [path, lbl] (path)}
-        <label class="sub">
-          <span class="mini-lbl">{lbl}</span>
-          <input
-            value={path.split(".").reduce((o: any, k) => o?.[k], sys)}
-            onchange={(e) => up(`system.${path}`, e.currentTarget.value)}
-          />
-        </label>
-      {/each}
+      <div class="hdr-sub">
+        {#each [["sire", "Sire"], ["details.ambition", "Ambition"], ["details.desire", "Desire"]] as const as [path, lbl] (path)}
+          <label class="sub">
+            <span class="mini-lbl">{lbl}</span>
+            <input value={path.split(".").reduce((o: any, k) => o?.[k], sys)} disabled={!editMode} onchange={(e) => up(`system.${path}`, e.currentTarget.value)} />
+          </label>
+        {/each}
+      </div>
     </div>
   </header>
+
+  {#if sys.clan}
+    <div class="banestrip">
+      <span class="bs-item"><span class="bs-k">Bane · Severity {baneSeverity}</span> {bane}</span>
+      <span class="bs-item"><span class="bs-k">Compulsion</span> {compulsion}</span>
+    </div>
+  {/if}
 
   <!-- body -->
   <div class="body">
     <section class="left">
       <div class="sect-h">Attributes</div>
-      <AttributeGrid
-        attributes={sys.attributes}
-        onrate={(k, n) => up(`system.attributes.${k}.value`, n)}
-        onroll={rollAttr}
-      />
+      <AttributeGrid attributes={sys.attributes} readonly={!editMode} onrate={(k, n) => up(`system.attributes.${k}.value`, n)} onroll={rollAttr} />
 
       <div class="sect-h">Skills</div>
       <SkillGrid
         skills={sys.skills}
+        readonly={!editMode}
         onrate={(k, n) => up(`system.skills.${k}.value`, n)}
         onspec={(k, list) => up(`system.skills.${k}.specialties`, list)}
         onroll={rollSkill}
@@ -169,25 +193,17 @@
     <aside class="rail">
       <div class="trk">
         <div class="trk-h"><span class="l">Health</span><span class="r">/ superficial · ✕ aggravated</span></div>
-        <DamageTrack
-          superficial={sys.health.superficial}
-          aggravated={sys.health.aggravated}
-          max={sys.health.max}
-          onchange={(v) => doc.update({ "system.health.superficial": v.superficial, "system.health.aggravated": v.aggravated })}
-        />
+        <DamageTrack superficial={sys.health.superficial} aggravated={sys.health.aggravated} max={sys.health.max}
+          onchange={(v) => doc.update({ "system.health.superficial": v.superficial, "system.health.aggravated": v.aggravated })} />
       </div>
 
       <div class="trk">
         <div class="trk-h">
           <span class="l">Willpower</span>
-          <button class="chk-btn" onclick={() => frenzyCheck(doc)} title="Resist Frenzy">Frenzy</button>
+          <button class="chk-btn" onclick={() => openFrenzyDialog(doc)} title="Resist Frenzy">Frenzy</button>
         </div>
-        <DamageTrack
-          superficial={sys.willpower.superficial}
-          aggravated={sys.willpower.aggravated}
-          max={sys.willpower.max}
-          onchange={(v) => doc.update({ "system.willpower.superficial": v.superficial, "system.willpower.aggravated": v.aggravated })}
-        />
+        <DamageTrack superficial={sys.willpower.superficial} aggravated={sys.willpower.aggravated} max={sys.willpower.max}
+          onchange={(v) => doc.update({ "system.willpower.superficial": v.superficial, "system.willpower.aggravated": v.aggravated })} />
       </div>
 
       <div class="rail-div"></div>
@@ -199,15 +215,9 @@
         </div>
         <div class="diamonds">
           {#each Array.from({ length: 5 }, (_, i) => i) as i (i)}
-            <span
-              class="dia"
-              class:on={i < sys.hunger}
-              role="button"
-              tabindex="0"
-              aria-label={`Hunger ${i + 1}`}
+            <span class="dia" class:on={i < sys.hunger} role="button" tabindex="0" aria-label={`Hunger ${i + 1}`}
               onclick={() => setHunger(i)}
-              onkeydown={(e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), setHunger(i))}
-            ></span>
+              onkeydown={(e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), setHunger(i))}></span>
           {/each}
         </div>
       </div>
@@ -224,16 +234,10 @@
         </div>
         <div class="humanity">
           {#each Array.from({ length: 10 }, (_, i) => i) as i (i)}
-            <span
-              class="ubox"
-              class:on={i < sys.humanity.value}
-              class:stain={i >= 10 - (sys.humanity.stains ?? 0)}
-              role="button"
-              tabindex="0"
-              aria-label={`Humanity ${i + 1}`}
+            <span class="ubox" class:on={i < sys.humanity.value} class:stain={i >= 10 - (sys.humanity.stains ?? 0)}
+              role="button" tabindex="0" aria-label={`Humanity ${i + 1}`}
               onclick={() => setHumanity(i)}
-              onkeydown={(e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), setHumanity(i))}
-            ></span>
+              onkeydown={(e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), setHumanity(i))}></span>
           {/each}
         </div>
       </div>
@@ -243,24 +247,18 @@
       <div class="trk">
         <div class="trk-h">
           <span class="l">Blood Potency</span>
-          <DotRating
-            value={sys.bloodPotency}
-            max={10}
-            size={11}
-            color="blood"
-            onchange={(n) => up("system.bloodPotency", n)}
-          />
+          <DotRating value={sys.bloodPotency} max={10} size={11} color="blood" readonly={!editMode} onchange={(n) => up("system.bloodPotency", n)} />
         </div>
         <div class="reso">
           <span class="mini-lbl">Resonance</span>
-          <select class="reso-sel" value={sys.resonance?.type ?? ""} onchange={(e) => up("system.resonance.type", e.currentTarget.value)}>
+          <select class="reso-sel" value={sys.resonance?.type ?? ""} disabled={!editMode} onchange={(e) => up("system.resonance.type", e.currentTarget.value)}>
             <option value="">—</option>
             {#each RESONANCES as r (r)}<option value={r}>{prettify(r)}</option>{/each}
           </select>
         </div>
         <div class="reso">
           <span class="mini-lbl">Intensity</span>
-          <select class="reso-sel" value={sys.resonance?.intensity ?? ""} onchange={(e) => up("system.resonance.intensity", e.currentTarget.value)}>
+          <select class="reso-sel" value={sys.resonance?.intensity ?? ""} disabled={!editMode} onchange={(e) => up("system.resonance.intensity", e.currentTarget.value)}>
             <option value="">—</option>
             {#each RESONANCE_INTENSITIES as r (r)}<option value={r}>{prettify(r)}</option>{/each}
           </select>
@@ -274,32 +272,47 @@
     <section class="panel brd">
       <div class="sect-h with-add">
         Disciplines
-        <button class="add-btn" onclick={() => createItem(doc, "discipline")} title="Add discipline">+ Add</button>
+        {#if editMode}<button class="add-btn" onclick={() => createItem(doc, "discipline")} title="Add discipline">+ Add</button>{/if}
       </div>
       {#if disciplines.length === 0}
-        <p class="empty">Drag Discipline items here, or click <b>+ Add</b>.</p>
+        <p class="empty">Drag Discipline items here{#if editMode}, or click <b>+ Add</b>{/if}.</p>
       {/if}
       {#each disciplines as d (d.id)}
         {@const powers = powersFor(d.id)}
         <div class="disc gl-hoverable" data-item-id={d.id}>
           <div class="disc-h">
             <button class="caret" class:open={!collapsed[d.id]} onclick={() => toggle(d.id)} aria-label="Toggle powers">▸</button>
-            <span class="disc-name">{d.name}</span>
-            <DotRating value={d.system.value} onchange={(n) => upItem(d.id, "system.value", n)} />
-            <ItemControls onedit={() => editItem(doc, d.id)} ondelete={() => deleteItem(doc, d.id)} />
+            <button class="disc-name reveal" onclick={() => reveal(d.id)} title="Show detail">{d.name}</button>
+            <button class="mini-roll" onclick={() => rollDiscipline(doc, d)} title="Roll {d.name}" aria-label="Roll">⚄</button>
+            <DotRating value={d.system.value} size={13} readonly={!editMode} onchange={(n) => upItem(d.id, "system.value", n)} />
+            {#if editMode}<ItemControls onedit={() => editItem(doc, d.id)} ondelete={() => deleteItem(doc, d.id)} />{/if}
           </div>
+          {#if expanded[d.id] && d.system.description}
+            <div class="detail">{@html d.system.description}</div>
+          {/if}
           {#if !collapsed[d.id]}
             {#each powers as p (p.id)}
               <div class="pw gl-row" data-item-id={p.id}>
                 <span class="pw-lvl">{p.system.level}</span>
-                <span class="pw-name">{p.name}</span>
-                <ItemControls onedit={() => editItem(doc, p.id)} ondelete={() => deleteItem(doc, p.id)} />
+                <button class="pw-name reveal" onclick={() => reveal(p.id)} title="Show detail">{p.name}</button>
+                <button class="mini-roll" onclick={() => rollPower(doc, p)} title="Roll {p.name}" aria-label="Roll">⚄</button>
+                {#if editMode}<ItemControls onedit={() => editItem(doc, p.id)} ondelete={() => deleteItem(doc, p.id)} />{/if}
               </div>
+              {#if expanded[p.id]}
+                <div class="detail pw-detail">
+                  <div class="detail-facts">
+                    {#if p.system.cost}<span><b>Cost</b> {p.system.cost}</span>{/if}
+                    {#if p.system.pool}<span><b>Pool</b> {p.system.pool}</span>{/if}
+                    {#if p.system.opposingPool}<span><b>vs</b> {p.system.opposingPool}</span>{/if}
+                    {#if p.system.amalgam?.discipline}<span><b>Amalgam</b> {prettify(p.system.amalgam.discipline)} {p.system.amalgam.level}</span>{/if}
+                  </div>
+                  {#if p.system.description}<div class="detail-body">{@html p.system.description}</div>{/if}
+                </div>
+              {/if}
             {/each}
-            <button
-              class="sub-add"
-              onclick={() => createItem(doc, "power", { "system.parentDiscipline": d.id, "system.discipline": d.system.discipline })}
-            >+ Power</button>
+            {#if editMode}
+              <button class="sub-add" onclick={() => createItem(doc, "power", { "system.parentDiscipline": d.id, "system.discipline": d.system.discipline })}>+ Power</button>
+            {/if}
           {/if}
         </div>
       {/each}
@@ -308,24 +321,31 @@
     <section class="panel">
       <div class="sect-h with-add">
         Advantages &amp; Flaws
-        <button class="add-btn" onclick={() => createItem(doc, "advantage")} title="Add advantage">+ Add</button>
+        {#if editMode}<button class="add-btn" onclick={() => createItem(doc, "advantage")} title="Add advantage">+ Add</button>{/if}
       </div>
-      {#if advantages.length === 0}
+      {#if items.filter((i) => i.type === "advantage").length === 0}
         <p class="empty">Merits, Flaws, Backgrounds &amp; Loresheets.</p>
       {/if}
-      {#each advantages as a (a.id)}
-        <div class="adv gl-row" data-item-id={a.id}>
-          <span class="adv-lbl" class:flaw={a.system.kind === "flaw"}>
-            <b>{a.name}</b><i>· {prettify(a.system.kind)}</i>
-          </span>
-          <DotRating
-            value={a.system.value}
-            max={a.system.maxValue || 5}
-            size={10}
-            onchange={(n) => upItem(a.id, "system.value", n)}
-          />
-          <ItemControls onedit={() => editItem(doc, a.id)} ondelete={() => deleteItem(doc, a.id)} />
-        </div>
+      {#each ADV_GROUPS as grp (grp.kind)}
+        {@const list = advOf(grp.kind)}
+        {#if list.length}
+          <div class="adv-group">
+            <div class="adv-group-h" data-kind={grp.kind}>{grp.label}</div>
+            {#each list as a (a.id)}
+              <div class="adv gl-row" data-item-id={a.id}>
+                <button class="adv-lbl reveal" class:flaw={grp.kind === "flaw"} onclick={() => reveal(a.id)} title="Show detail">
+                  <span class="adv-tag" data-kind={grp.kind}>{grp.label.slice(0, 1)}</span>
+                  <b>{a.name}</b>
+                </button>
+                <DotRating value={a.system.value} max={a.system.maxValue || 5} size={13} readonly={!editMode} onchange={(n) => upItem(a.id, "system.value", n)} />
+                {#if editMode}<ItemControls onedit={() => editItem(doc, a.id)} ondelete={() => deleteItem(doc, a.id)} />{/if}
+              </div>
+              {#if expanded[a.id] && a.system.description}
+                <div class="detail">{@html a.system.description}</div>
+              {/if}
+            {/each}
+          </div>
+        {/if}
       {/each}
     </section>
   </div>
@@ -335,69 +355,64 @@
     <section class="panel brd">
       <div class="sect-h with-add">
         Rituals &amp; Ceremonies
-        <span class="add-group">
-          <button class="add-btn" onclick={() => createItem(doc, "ritual")} title="Add Blood Sorcery ritual">+ Ritual</button>
-          <button class="add-btn" onclick={() => createItem(doc, "ceremony")} title="Add Oblivion ceremony">+ Ceremony</button>
-        </span>
+        {#if editMode}
+          <span class="add-group">
+            <button class="add-btn" onclick={() => createItem(doc, "ritual")} title="Add Blood Sorcery ritual">+ Ritual</button>
+            <button class="add-btn" onclick={() => createItem(doc, "ceremony")} title="Add Oblivion ceremony">+ Ceremony</button>
+          </span>
+        {/if}
       </div>
       {#if rituals.length === 0 && ceremonies.length === 0}
         <p class="empty">Blood Sorcery rituals &amp; Oblivion ceremonies.</p>
       {/if}
       {#each [...rituals, ...ceremonies] as r (r.id)}
         <div class="adv gl-row" data-item-id={r.id}>
-          <span class="adv-lbl">
+          <button class="adv-lbl reveal" onclick={() => reveal(r.id)}>
             <b>{r.name}</b><i>· {prettify(r.type)} {r.system.level}</i>
-          </span>
-          <ItemControls onedit={() => editItem(doc, r.id)} ondelete={() => deleteItem(doc, r.id)} />
+          </button>
+          {#if editMode}<ItemControls onedit={() => editItem(doc, r.id)} ondelete={() => deleteItem(doc, r.id)} />{/if}
         </div>
+        {#if expanded[r.id] && r.system.description}
+          <div class="detail">{@html r.system.description}</div>
+        {/if}
       {/each}
     </section>
 
     <section class="panel">
       <div class="sect-h with-add">
         Equipment
-        <span class="add-group">
-          <button class="add-btn" onclick={() => createItem(doc, "weapon")} title="Add weapon">+ Weapon</button>
-          <button class="add-btn" onclick={() => createItem(doc, "armor")} title="Add armor">+ Armor</button>
-          <button class="add-btn" onclick={() => createItem(doc, "gear")} title="Add gear">+ Gear</button>
-        </span>
+        {#if editMode}
+          <span class="add-group">
+            <button class="add-btn" onclick={() => createItem(doc, "weapon")} title="Add weapon">+ Weapon</button>
+            <button class="add-btn" onclick={() => createItem(doc, "armor")} title="Add armor">+ Armor</button>
+            <button class="add-btn" onclick={() => createItem(doc, "gear")} title="Add gear">+ Gear</button>
+          </span>
+        {/if}
       </div>
       {#if weapons.length === 0 && armor.length === 0 && gear.length === 0}
         <p class="empty">Weapons, armor &amp; carried gear.</p>
       {/if}
       {#each weapons as w (w.id)}
         <div class="eq gl-row" data-item-id={w.id}>
-          <button
-            class="eq-check"
-            class:on={w.system.equipped}
-            aria-label="Toggle equipped"
-            title="Equipped"
-            onclick={() => upItem(w.id, "system.equipped", !w.system.equipped)}
-          >✓</button>
+          <button class="eq-check" class:on={w.system.equipped} aria-label="Toggle equipped" title="Equipped" onclick={() => upItem(w.id, "system.equipped", !w.system.equipped)}>✓</button>
           <span class="eq-name"><b>{w.name}</b></span>
           <span class="eq-stat">{w.system.damage} {w.system.damageType === "aggravated" ? "agg" : "sup"}</span>
-          <ItemControls onedit={() => editItem(doc, w.id)} ondelete={() => deleteItem(doc, w.id)} />
+          {#if editMode}<ItemControls onedit={() => editItem(doc, w.id)} ondelete={() => deleteItem(doc, w.id)} />{/if}
         </div>
       {/each}
       {#each armor as a (a.id)}
         <div class="eq gl-row" data-item-id={a.id}>
-          <button
-            class="eq-check"
-            class:on={a.system.equipped}
-            aria-label="Toggle equipped"
-            title="Equipped"
-            onclick={() => upItem(a.id, "system.equipped", !a.system.equipped)}
-          >✓</button>
+          <button class="eq-check" class:on={a.system.equipped} aria-label="Toggle equipped" title="Equipped" onclick={() => upItem(a.id, "system.equipped", !a.system.equipped)}>✓</button>
           <span class="eq-name"><b>{a.name}</b></span>
           <span class="eq-stat">rating {a.system.rating}</span>
-          <ItemControls onedit={() => editItem(doc, a.id)} ondelete={() => deleteItem(doc, a.id)} />
+          {#if editMode}<ItemControls onedit={() => editItem(doc, a.id)} ondelete={() => deleteItem(doc, a.id)} />{/if}
         </div>
       {/each}
       {#each gear as g (g.id)}
         <div class="eq gl-row" data-item-id={g.id}>
           <span class="eq-qty">×{g.system.quantity}</span>
           <span class="eq-name"><b>{g.name}</b></span>
-          <ItemControls onedit={() => editItem(doc, g.id)} ondelete={() => deleteItem(doc, g.id)} />
+          {#if editMode}<ItemControls onedit={() => editItem(doc, g.id)} ondelete={() => deleteItem(doc, g.id)} />{/if}
         </div>
       {/each}
     </section>
@@ -408,7 +423,7 @@
     <section class="panel brd">
       <div class="sect-h with-add">
         Convictions &amp; Touchstones
-        <button class="add-btn" onclick={addConviction} title="Add conviction">+ Add</button>
+        {#if editMode}<button class="add-btn" onclick={addConviction} title="Add conviction">+ Add</button>{/if}
       </div>
       {#if (sys.convictions ?? []).length === 0}
         <p class="empty">No convictions recorded.</p>
@@ -416,23 +431,13 @@
       {#each sys.convictions ?? [] as c, i (i)}
         <div class="conv gl-row">
           <div class="conv-body">
-            <input
-              class="conv-q-in"
-              placeholder="Conviction…"
-              value={c.conviction}
-              onchange={(e) => updateConviction(i, "conviction", e.currentTarget.value)}
-            />
+            <input class="conv-q-in" placeholder="Conviction…" value={c.conviction} disabled={!editMode} onchange={(e) => updateConviction(i, "conviction", e.currentTarget.value)} />
             <label class="conv-t">
               <span class="mini-lbl">Touchstone</span>
-              <input
-                class="conv-t-in"
-                placeholder="Name…"
-                value={c.touchstone}
-                onchange={(e) => updateConviction(i, "touchstone", e.currentTarget.value)}
-              />
+              <input class="conv-t-in" placeholder="Name…" value={c.touchstone} disabled={!editMode} onchange={(e) => updateConviction(i, "touchstone", e.currentTarget.value)} />
             </label>
           </div>
-          <ItemControls ondelete={() => removeConviction(i)} />
+          {#if editMode}<ItemControls ondelete={() => removeConviction(i)} />{/if}
         </div>
       {/each}
     </section>
@@ -440,24 +445,13 @@
       <div class="sect-h ink">Experience</div>
       <label class="xp-row">
         <span class="xp-k">Unspent</span>
-        <input
-          class="xp-big"
-          type="number"
-          min="0"
-          value={sys.xp?.value ?? 0}
-          onchange={(e) => up("system.xp.value", Number(e.currentTarget.value))}
-        />
+        <input class="xp-big" type="number" min="0" value={sys.xp?.value ?? 0} onchange={(e) => up("system.xp.value", Number(e.currentTarget.value))} />
       </label>
       <label class="xp-row2">
         <span>Total earned</span>
-        <input
-          class="xp-tot"
-          type="number"
-          min="0"
-          value={sys.xp?.total ?? 0}
-          onchange={(e) => up("system.xp.total", Number(e.currentTarget.value))}
-        />
+        <input class="xp-tot" type="number" min="0" value={sys.xp?.total ?? 0} onchange={(e) => up("system.xp.total", Number(e.currentTarget.value))} />
       </label>
+      <button class="xp-spend" onclick={() => openXpDialog(doc)}>Spend Experience…</button>
     </section>
   </div>
 
@@ -505,8 +499,8 @@
     border: none;
     border-bottom: 1px solid transparent;
   }
-  input:hover,
-  select:hover {
+  input:hover:not(:disabled),
+  select:hover:not(:disabled) {
     border-bottom-color: var(--gl-line);
   }
   input:focus,
@@ -514,12 +508,21 @@
     outline: none;
     border-bottom-color: var(--gl-blood);
   }
+  input:disabled,
+  select:disabled {
+    color: var(--gl-ink);
+    opacity: 1;
+    cursor: default;
+  }
 
   /* header */
   .hdr {
-    padding: 26px 34px 20px;
+    padding: 22px 30px 16px;
     border-bottom: 2px solid var(--gl-ink);
     position: relative;
+    display: flex;
+    gap: 20px;
+    align-items: stretch;
   }
   .spine {
     position: absolute;
@@ -529,13 +532,20 @@
     height: 5px;
     background: var(--gl-blood);
   }
+  .hdr-main {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+  }
   .hdr-top {
     display: flex;
-    align-items: flex-end;
-    gap: 20px;
+    align-items: flex-start;
+    gap: 16px;
   }
   .idblock {
     flex: 1;
+    min-width: 0;
   }
   .eyebrow {
     font-family: var(--gl-cond);
@@ -548,15 +558,42 @@
   .name {
     font-family: var(--gl-serif);
     font-weight: 700;
-    font-size: 44px;
+    font-size: 40px;
     line-height: 1;
-    margin-top: 4px;
+    margin-top: 2px;
     width: 100%;
+  }
+  .hdr-tools {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: none;
+  }
+  .mode-toggle,
+  .tool-btn {
+    font-family: var(--gl-cond);
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    font-size: 10px;
+    padding: 6px 10px;
+    border: 1px solid var(--gl-line);
+    background: transparent;
+    color: var(--gl-muted-2);
+    cursor: pointer;
+  }
+  .mode-toggle.on {
+    color: var(--gl-blood);
+    border-color: var(--gl-blood);
+  }
+  .tool-btn:hover,
+  .mode-toggle:hover {
+    border-color: var(--gl-blood);
+    color: var(--gl-blood);
   }
   .facts {
     display: flex;
     gap: 26px;
-    text-align: right;
+    margin-top: 12px;
   }
   .fact {
     display: flex;
@@ -573,22 +610,26 @@
   .fv-in {
     font-family: var(--gl-serif);
     font-weight: 600;
-    font-size: 22px;
-    text-align: right;
+    font-size: 20px;
   }
   .fv-in {
-    width: 70px;
+    width: 64px;
   }
   .hdr-sub {
     display: flex;
-    gap: 34px;
-    margin-top: 14px;
+    gap: 30px;
+    margin-top: 12px;
     flex-wrap: wrap;
   }
   .sub {
     font-size: 13px;
     display: inline-flex;
     align-items: baseline;
+    flex: 1;
+    min-width: 140px;
+  }
+  .sub input {
+    flex: 1;
   }
   .mini-lbl {
     font-family: var(--gl-cond);
@@ -598,6 +639,61 @@
     color: var(--gl-muted);
     margin-right: 6px;
   }
+  .roll-cta {
+    font-family: var(--gl-cond);
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    font-size: 11px;
+    color: var(--gl-parch);
+    background: var(--gl-blood);
+    border: 1px solid var(--gl-blood);
+    padding: 6px 14px;
+    cursor: pointer;
+  }
+  .roll-cta:hover {
+    background: var(--gl-blood-bright);
+  }
+
+  /* clan bane strip */
+  .banestrip {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 26px;
+    padding: 8px 30px;
+    background: var(--gl-parch-raise);
+    border-bottom: 1px solid var(--gl-line);
+    font-size: 12px;
+    color: var(--gl-muted-2);
+  }
+  .bs-item {
+    flex: 1;
+    min-width: 260px;
+  }
+  .bs-k {
+    font-family: var(--gl-cond);
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    font-size: 9px;
+    color: var(--gl-blood);
+    margin-right: 6px;
+  }
+
+  .chk-btn {
+    font-family: var(--gl-cond);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-size: 9px;
+    color: var(--gl-blood);
+    background: transparent;
+    border: 1px solid var(--gl-line);
+    border-radius: 3px;
+    padding: 1px 7px;
+    cursor: pointer;
+  }
+  .chk-btn:hover {
+    border-color: var(--gl-blood);
+    background: color-mix(in srgb, var(--gl-blood) 8%, transparent);
+  }
 
   /* body */
   .body {
@@ -605,7 +701,7 @@
     grid-template-columns: 1fr 300px;
   }
   .left {
-    padding: 26px 30px;
+    padding: 20px 26px;
     border-right: 1px solid var(--gl-line);
   }
   .sect-h {
@@ -617,7 +713,7 @@
     color: var(--gl-blood);
     border-bottom: 1px solid var(--gl-ink);
     padding-bottom: 5px;
-    margin-bottom: 16px;
+    margin-bottom: 14px;
   }
   .sect-h.with-add {
     display: flex;
@@ -645,50 +741,19 @@
     border-color: var(--gl-blood);
     background: color-mix(in srgb, var(--gl-blood) 8%, transparent);
   }
-  .roll-cta {
-    align-self: center;
-    font-family: var(--gl-cond);
-    text-transform: uppercase;
-    letter-spacing: 2px;
-    font-size: 11px;
-    color: var(--gl-parch);
-    background: var(--gl-blood);
-    border: 1px solid var(--gl-blood);
-    padding: 7px 14px;
-    cursor: pointer;
-  }
-  .roll-cta:hover {
-    background: var(--gl-blood-bright);
-  }
-  .chk-btn {
-    font-family: var(--gl-cond);
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    font-size: 9px;
-    color: var(--gl-blood);
-    background: transparent;
-    border: 1px solid var(--gl-line);
-    border-radius: 3px;
-    padding: 1px 7px;
-    cursor: pointer;
-  }
-  .chk-btn:hover {
-    border-color: var(--gl-blood);
-    background: color-mix(in srgb, var(--gl-blood) 8%, transparent);
-  }
   /* rail */
   .rail {
-    padding: 26px 24px;
+    padding: 20px 22px;
     background: var(--gl-parch-raise);
   }
   .trk {
-    margin-bottom: 20px;
+    margin-bottom: 16px;
   }
   .trk-h {
     display: flex;
     justify-content: space-between;
     align-items: baseline;
-    margin-bottom: 8px;
+    margin-bottom: 7px;
   }
   .trk-h .l {
     font-family: var(--gl-cond);
@@ -709,15 +774,15 @@
   .rail-div {
     height: 1px;
     background: var(--gl-line);
-    margin: 0 -24px 20px;
+    margin: 0 -22px 16px;
   }
   .diamonds {
     display: flex;
     gap: 8px;
   }
   .dia {
-    width: 26px;
-    height: 26px;
+    width: 24px;
+    height: 24px;
     border-radius: 6px;
     transform: rotate(45deg);
     border: 1.5px solid var(--gl-blood);
@@ -787,7 +852,7 @@
     justify-content: space-between;
     align-items: center;
     font-size: 13px;
-    padding: 6px 0;
+    padding: 5px 0;
     border-top: 1px dotted var(--gl-line-soft);
   }
   .reso-sel {
@@ -804,19 +869,19 @@
     border-top: 1px solid var(--gl-line);
   }
   .panel {
-    padding: 22px 30px;
+    padding: 20px 26px;
   }
   .panel.brd {
     border-right: 1px solid var(--gl-line);
   }
   .disc {
-    margin-bottom: 12px;
+    margin-bottom: 10px;
   }
   .disc-h {
     display: flex;
     align-items: center;
     gap: 8px;
-    margin-bottom: 5px;
+    margin-bottom: 4px;
   }
   .caret {
     background: transparent;
@@ -832,11 +897,39 @@
   .caret.open {
     transform: rotate(90deg);
   }
+  .reveal {
+    background: transparent;
+    border: none;
+    padding: 0;
+    text-align: left;
+    cursor: pointer;
+    color: inherit;
+    font: inherit;
+  }
   .disc-name {
     font-family: var(--gl-serif);
     font-weight: 600;
     font-size: 18px;
     flex: 1;
+    color: var(--gl-ink);
+  }
+  .disc-name:hover,
+  .pw-name:hover,
+  .adv-lbl:hover b {
+    color: var(--gl-blood);
+  }
+  .mini-roll {
+    background: transparent;
+    border: none;
+    color: var(--gl-blood);
+    cursor: pointer;
+    font-size: 14px;
+    padding: 0 2px;
+    line-height: 1;
+    flex: none;
+  }
+  .mini-roll:hover {
+    color: var(--gl-blood-bright);
   }
   .pw {
     display: flex;
@@ -857,6 +950,42 @@
   }
   .pw-name {
     flex: 1;
+    font-size: 12px;
+    color: var(--gl-muted-2);
+  }
+  .detail {
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--gl-muted-2);
+    background: var(--gl-parch-raise);
+    border-left: 2px solid var(--gl-blood);
+    padding: 8px 12px;
+    margin: 2px 0 8px;
+  }
+  .detail :global(p) {
+    margin: 0 0 6px;
+  }
+  .detail :global(p:last-child) {
+    margin-bottom: 0;
+  }
+  .pw-detail {
+    margin-left: 20px;
+  }
+  .detail-facts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 14px;
+    font-family: var(--gl-cond);
+    font-size: 11px;
+    letter-spacing: 0.5px;
+    margin-bottom: 6px;
+  }
+  .detail-facts b {
+    color: var(--gl-blood);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-size: 9px;
+    margin-right: 3px;
   }
   .sub-add {
     font-family: var(--gl-cond);
@@ -873,19 +1002,43 @@
   .sub-add:hover {
     color: var(--gl-blood);
   }
+
+  /* advantages grouped by kind */
+  .adv-group {
+    margin-bottom: 12px;
+  }
+  .adv-group-h {
+    font-family: var(--gl-cond);
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    font-size: 10px;
+    color: var(--gl-muted);
+    border-bottom: 1px dotted var(--gl-line);
+    padding-bottom: 2px;
+    margin-bottom: 6px;
+  }
+  .adv-group-h[data-kind="background"] {
+    color: var(--gl-gold);
+  }
+  .adv-group-h[data-kind="flaw"] {
+    color: var(--gl-blood);
+  }
   .adv {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 10px;
-    margin-bottom: 8px;
-    padding-bottom: 7px;
+    margin-bottom: 6px;
+    padding-bottom: 5px;
     border-bottom: 1px dotted var(--gl-line-soft);
   }
   .adv-lbl {
     font-size: 13px;
     line-height: 1.25;
     flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 7px;
   }
   .adv-lbl b {
     font-family: var(--gl-semi);
@@ -894,16 +1047,43 @@
   .adv-lbl i {
     color: var(--gl-muted);
     font-size: 11px;
+    margin-left: 5px;
   }
   .adv-lbl.flaw b {
     color: var(--gl-blood);
+  }
+  .adv-tag {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    border-radius: 3px;
+    font-family: var(--gl-cond);
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--gl-parch);
+    background: var(--gl-muted);
+    flex: none;
+  }
+  .adv-tag[data-kind="background"] {
+    background: var(--gl-gold);
+  }
+  .adv-tag[data-kind="merit"] {
+    background: var(--gl-good);
+  }
+  .adv-tag[data-kind="flaw"] {
+    background: var(--gl-blood);
+  }
+  .adv-tag[data-kind="loresheet"] {
+    background: var(--gl-ink-soft);
   }
   .eq {
     display: flex;
     align-items: center;
     gap: 10px;
-    margin-bottom: 7px;
-    padding-bottom: 6px;
+    margin-bottom: 6px;
+    padding-bottom: 5px;
     border-bottom: 1px dotted var(--gl-line-soft);
     font-size: 13px;
   }
@@ -986,7 +1166,7 @@
     flex: 1;
   }
   .xp {
-    padding: 22px 24px;
+    padding: 20px 22px;
     background: var(--gl-parch-raise);
   }
   .sect-h.ink {
@@ -1005,7 +1185,7 @@
   .xp-big {
     font-family: var(--gl-serif);
     font-weight: 700;
-    font-size: 34px;
+    font-size: 32px;
     color: var(--gl-blood);
     line-height: 1;
     font-variant-numeric: tabular-nums;
@@ -1027,5 +1207,21 @@
     width: 60px;
     text-align: right;
     font-variant-numeric: tabular-nums;
+  }
+  .xp-spend {
+    margin-top: 12px;
+    width: 100%;
+    font-family: var(--gl-cond);
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    font-size: 11px;
+    color: var(--gl-parch);
+    background: var(--gl-blood);
+    border: 1px solid var(--gl-blood);
+    padding: 8px;
+    cursor: pointer;
+  }
+  .xp-spend:hover {
+    background: var(--gl-blood-bright);
   }
 </style>
