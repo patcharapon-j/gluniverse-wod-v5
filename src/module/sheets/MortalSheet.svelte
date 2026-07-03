@@ -6,8 +6,10 @@
   import SkillGrid from "../components/SkillGrid.svelte";
   import ItemControls from "../components/ItemControls.svelte";
   import EffectsPanel from "../components/EffectsPanel.svelte";
+  import Portrait from "../components/Portrait.svelte";
   import { createItem, editItem, deleteItem } from "../apps/actor-items.ts";
   import { openRollDialog } from "../apps/RollDialogApp.ts";
+  import { pickImage } from "../apps/image.ts";
 
   /* eslint-disable @typescript-eslint/no-explicit-any */
   interface Props {
@@ -26,6 +28,7 @@
   const equipment = $derived(items.filter((i) => ["weapon", "armor", "gear"].includes(i.type)));
 
   let dragOver = $state(false);
+  let editMode = $state(false);
 
   function up(path: string, value: unknown) {
     doc.update({ [path]: value });
@@ -56,30 +59,39 @@
 >
   <header class="hdr">
     <div class="spine"></div>
-    <div class="hdr-top">
-      <div class="idblock">
-        <div class="eyebrow">{isGhoul ? "Ghoul · Blood-Bound" : "Mortal"} · World of Darkness</div>
-        <input class="name" value={snap.name} onchange={(e) => doc.update({ name: e.currentTarget.value })} />
+    <Portrait img={snap.img} name={snap.name} editable={editMode} onedit={() => pickImage(doc)} />
+    <div class="hdr-main">
+      <div class="hdr-top">
+        <div class="idblock">
+          <div class="eyebrow">{isGhoul ? "Ghoul · Blood-Bound" : "Mortal"} · World of Darkness</div>
+          <input class="name" value={snap.name} disabled={!editMode} onchange={(e) => doc.update({ name: e.currentTarget.value })} />
+        </div>
+        <div class="hdr-tools">
+          <button class="mode-toggle" class:on={editMode} onclick={() => (editMode = !editMode)} title="Toggle play / edit">
+            {editMode ? "🔓 Edit" : "🔒 Play"}
+          </button>
+          <button class="roll-cta" onclick={openPool} title="Build a dice pool">Roll Pool</button>
+        </div>
       </div>
-      <button class="roll-cta" onclick={openPool} title="Build a dice pool">Roll Pool</button>
-    </div>
-    <div class="hdr-sub">
-      {#each [["details.concept", "Concept"], ["details.ambition", "Ambition"], ["details.desire", "Desire"]] as const as [path, lbl] (path)}
-        <label class="sub">
-          <span class="mini-lbl">{lbl}</span>
-          <input value={path.split(".").reduce((o: any, k) => o?.[k], sys)} onchange={(e) => up(`system.${path}`, e.currentTarget.value)} />
-        </label>
-      {/each}
+      <div class="hdr-sub">
+        {#each [["details.concept", "Concept"], ["details.ambition", "Ambition"], ["details.desire", "Desire"]] as const as [path, lbl] (path)}
+          <label class="sub">
+            <span class="mini-lbl">{lbl}</span>
+            <input value={path.split(".").reduce((o: any, k) => o?.[k], sys)} disabled={!editMode} onchange={(e) => up(`system.${path}`, e.currentTarget.value)} />
+          </label>
+        {/each}
+      </div>
     </div>
   </header>
 
   <div class="body">
     <section class="left">
       <div class="sect-h">Attributes</div>
-      <AttributeGrid attributes={sys.attributes} onrate={(k, n) => up(`system.attributes.${k}.value`, n)} onroll={rollAttr} />
+      <AttributeGrid attributes={sys.attributes} readonly={!editMode} onrate={(k, n) => up(`system.attributes.${k}.value`, n)} onroll={rollAttr} />
       <div class="sect-h">Skills</div>
       <SkillGrid
         skills={sys.skills}
+        readonly={!editMode}
         onrate={(k, n) => up(`system.skills.${k}.value`, n)}
         onspec={(k, list) => up(`system.skills.${k}.specialties`, list)}
         onroll={rollSkill}
@@ -137,16 +149,16 @@
         <div class="rail-div"></div>
         <div class="trk">
           <div class="trk-h"><span class="l blood">Vitae</span></div>
-          <DotRating value={sys.vitae ?? 0} max={10} size={12} color="blood" onchange={(n) => up("system.vitae", n)} />
+          <DotRating value={sys.vitae ?? 0} max={10} size={12} color="blood" readonly={!editMode} onchange={(n) => up("system.vitae", n)} />
         </div>
         <div class="trk">
           <label class="ghoul-f">
             <span class="mini-lbl">Regnant (Domitor)</span>
-            <input value={sys.bloodBond?.regnant ?? ""} onchange={(e) => up("system.bloodBond.regnant", e.currentTarget.value)} />
+            <input value={sys.bloodBond?.regnant ?? ""} disabled={!editMode} onchange={(e) => up("system.bloodBond.regnant", e.currentTarget.value)} />
           </label>
           <div class="trk-h" style="margin-top:8px">
             <span class="l">Blood Bond</span>
-            <DotRating value={sys.bloodBond?.rating ?? 0} max={6} size={11} color="blood" onchange={(n) => up("system.bloodBond.rating", n)} />
+            <DotRating value={sys.bloodBond?.rating ?? 0} max={6} size={11} color="blood" readonly={!editMode} onchange={(n) => up("system.bloodBond.rating", n)} />
           </div>
         </div>
       {/if}
@@ -158,14 +170,14 @@
       <section class="panel brd">
         <div class="sect-h with-add">
           Disciplines
-          <button class="add-btn" onclick={() => createItem(doc, "discipline")}>+ Add</button>
+          {#if editMode}<button class="add-btn" onclick={() => createItem(doc, "discipline")}>+ Add</button>{/if}
         </div>
         {#if disciplines.length === 0}<p class="empty">Ghouls may hold a dot or two.</p>{/if}
         {#each disciplines as d (d.id)}
           <div class="line gl-row" data-item-id={d.id}>
             <span class="line-name">{d.name}</span>
-            <DotRating value={d.system.value} max={5} size={11} onchange={(n) => upItem(d.id, "system.value", n)} />
-            <ItemControls onedit={() => editItem(doc, d.id)} ondelete={() => deleteItem(doc, d.id)} />
+            <DotRating value={d.system.value} max={5} size={13} readonly={!editMode} onchange={(n) => upItem(d.id, "system.value", n)} />
+            {#if editMode}<ItemControls onedit={() => editItem(doc, d.id)} ondelete={() => deleteItem(doc, d.id)} />{/if}
           </div>
         {/each}
       </section>
@@ -174,14 +186,14 @@
     <section class="panel brd">
       <div class="sect-h with-add">
         Advantages &amp; Flaws
-        <button class="add-btn" onclick={() => createItem(doc, "advantage")}>+ Add</button>
+        {#if editMode}<button class="add-btn" onclick={() => createItem(doc, "advantage")}>+ Add</button>{/if}
       </div>
       {#if advantages.length === 0}<p class="empty">Merits, Flaws &amp; Backgrounds.</p>{/if}
       {#each advantages as a (a.id)}
         <div class="line gl-row" data-item-id={a.id}>
           <span class="line-name" class:flaw={a.system.kind === "flaw"}><b>{a.name}</b> <i>· {prettify(a.system.kind)}</i></span>
-          <DotRating value={a.system.value} max={a.system.maxValue || 5} size={10} onchange={(n) => upItem(a.id, "system.value", n)} />
-          <ItemControls onedit={() => editItem(doc, a.id)} ondelete={() => deleteItem(doc, a.id)} />
+          <DotRating value={a.system.value} max={a.system.maxValue || 5} size={13} readonly={!editMode} onchange={(n) => upItem(a.id, "system.value", n)} />
+          {#if editMode}<ItemControls onedit={() => editItem(doc, a.id)} ondelete={() => deleteItem(doc, a.id)} />{/if}
         </div>
       {/each}
     </section>
@@ -189,16 +201,18 @@
     <section class="panel">
       <div class="sect-h with-add">
         Equipment
-        <span class="add-group">
-          <button class="add-btn" onclick={() => createItem(doc, "weapon")}>+ Weapon</button>
-          <button class="add-btn" onclick={() => createItem(doc, "gear")}>+ Gear</button>
-        </span>
+        {#if editMode}
+          <span class="add-group">
+            <button class="add-btn" onclick={() => createItem(doc, "weapon")}>+ Weapon</button>
+            <button class="add-btn" onclick={() => createItem(doc, "gear")}>+ Gear</button>
+          </span>
+        {/if}
       </div>
       {#if equipment.length === 0}<p class="empty">Weapons, armor &amp; gear.</p>{/if}
       {#each equipment as g (g.id)}
         <div class="line gl-row" data-item-id={g.id}>
           <span class="line-name"><b>{g.name}</b> <i>· {prettify(g.type)}</i></span>
-          <ItemControls onedit={() => editItem(doc, g.id)} ondelete={() => deleteItem(doc, g.id)} />
+          {#if editMode}<ItemControls onedit={() => editItem(doc, g.id)} ondelete={() => deleteItem(doc, g.id)} />{/if}
         </div>
       {/each}
     </section>
@@ -249,17 +263,56 @@
     border: none;
     border-bottom: 1px solid transparent;
   }
-  input:hover {
+  input:hover:not(:disabled) {
     border-bottom-color: var(--gl-line);
   }
   input:focus {
     outline: none;
     border-bottom-color: var(--gl-blood);
   }
+  input:disabled {
+    color: var(--gl-ink);
+    opacity: 1;
+    cursor: default;
+  }
   .hdr {
-    padding: 26px 34px 20px;
+    padding: 22px 30px 18px;
     border-bottom: 2px solid var(--gl-ink);
     position: relative;
+    display: flex;
+    gap: 20px;
+    align-items: stretch;
+  }
+  .hdr-main {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .hdr-tools {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: none;
+  }
+  .mode-toggle {
+    font-family: var(--gl-cond);
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    font-size: 10px;
+    padding: 6px 10px;
+    border: 1px solid var(--gl-line);
+    background: transparent;
+    color: var(--gl-muted-2);
+    cursor: pointer;
+  }
+  .mode-toggle.on {
+    color: var(--gl-blood);
+    border-color: var(--gl-blood);
+  }
+  .mode-toggle:hover {
+    border-color: var(--gl-blood);
+    color: var(--gl-blood);
   }
   .spine {
     position: absolute;
