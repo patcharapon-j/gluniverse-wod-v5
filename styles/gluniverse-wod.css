@@ -57,6 +57,176 @@
   background: var(--gl-parch);
 }
 
+/* ------------------------------------------------------------------ *
+ * Chat cards. Rendered as HTML strings into Foundry's chat log, so the
+ * styling lives here (global) rather than inside a Svelte component.
+ * ------------------------------------------------------------------ */
+.gl-card {
+  font-family: var(--gl-body);
+  color: var(--gl-ink);
+  background: var(--gl-parch);
+  border: 1px solid var(--gl-line);
+  border-left: 4px solid var(--gl-blood);
+  padding: 10px 12px;
+  margin: -3px 0;
+}
+.gl-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  border-bottom: 1px solid var(--gl-line);
+  padding-bottom: 5px;
+  margin-bottom: 8px;
+}
+.gl-card-actor {
+  font-family: var(--gl-serif);
+  font-weight: 700;
+  font-size: 17px;
+}
+.gl-card-flavor {
+  font-family: var(--gl-cond);
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  font-size: 10px;
+  color: var(--gl-muted);
+  text-align: right;
+}
+.gl-card-outcome {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.gl-badge {
+  font-family: var(--gl-cond);
+  text-transform: uppercase;
+  letter-spacing: 3px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.gl-succ {
+  font-size: 13px;
+  color: var(--gl-muted-2);
+}
+.gl-succ b {
+  font-family: var(--gl-serif);
+  font-size: 20px;
+  color: var(--gl-ink);
+}
+.gl-out-critical .gl-badge,
+.gl-out-messy .gl-badge {
+  color: var(--gl-blood);
+}
+.gl-out-messy .gl-badge {
+  color: var(--gl-blood-bright);
+}
+.gl-out-success .gl-badge {
+  color: var(--gl-good);
+}
+.gl-out-bestial .gl-badge,
+.gl-out-failure .gl-badge,
+.gl-out-totalFailure .gl-badge {
+  color: var(--gl-muted-2);
+}
+.gl-out-bestial .gl-badge {
+  color: var(--gl-blood-bright);
+}
+.gl-dice {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+.gl-die {
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--gl-cond);
+  font-weight: 600;
+  font-size: 13px;
+  border: 1.5px solid var(--gl-line);
+  background: var(--gl-parch-raise);
+  color: var(--gl-muted-2);
+  box-sizing: border-box;
+}
+.gl-die.hit {
+  border-color: var(--gl-ink);
+  color: var(--gl-ink);
+}
+.gl-die.crit {
+  border-color: var(--gl-gold);
+  background: var(--gl-gold);
+  color: var(--gl-stage);
+}
+.gl-die.hunger {
+  border-color: var(--gl-blood);
+  color: var(--gl-blood);
+  background: var(--gl-rouse-bg);
+}
+.gl-die.hunger.crit {
+  background: var(--gl-blood-bright);
+  color: var(--gl-parch);
+  border-color: var(--gl-blood-bright);
+}
+.gl-die.hunger.bane {
+  background: var(--gl-blood);
+  color: var(--gl-parch);
+  border-color: var(--gl-blood);
+}
+.gl-die.rerolled {
+  outline: 2px dotted var(--gl-gold);
+  outline-offset: 1px;
+}
+.gl-card-meta {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  font-family: var(--gl-cond);
+  font-size: 10px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--gl-muted);
+}
+.gl-crit-note {
+  color: var(--gl-blood);
+}
+.gl-bane-note {
+  color: var(--gl-blood-bright);
+}
+.gl-card-detail {
+  font-size: 13px;
+  color: var(--gl-muted-2);
+  font-style: italic;
+}
+.gl-card-actions {
+  margin-top: 8px;
+  display: flex;
+  gap: 6px;
+}
+.gl-act {
+  font-family: var(--gl-cond);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  font-size: 10px;
+  color: var(--gl-blood);
+  background: transparent;
+  border: 1px solid var(--gl-line);
+  border-radius: 3px;
+  padding: 3px 10px;
+  cursor: pointer;
+}
+.gl-act:hover {
+  border-color: var(--gl-blood);
+  background: color-mix(in srgb, var(--gl-blood) 8%, transparent);
+}
+.gl-act[disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 /* Reduced-motion respect for any component transitions. */
 @media (prefers-reduced-motion: reduce) {
   .gluniverse-wod * {

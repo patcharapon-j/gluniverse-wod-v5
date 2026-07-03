@@ -8,14 +8,25 @@
 import { SYSTEM_ID } from "./config.ts";
 import { registerDataModels } from "./data/index.ts";
 import { registerSheets } from "./sheets/register.ts";
+import { registerChatActions } from "./dice/chat-actions.ts";
+import { openRollDialog } from "./apps/RollDialogApp.ts";
+import { rouseCheck, remorseCheck, frenzyCheck } from "./dice/checks.ts";
 
 Hooks.once("init", () => {
   console.log(`${SYSTEM_ID} | Initializing GLUniverse — World of Darkness V5`);
   registerDataModels();
   registerSheets();
+  registerChatActions();
 });
 
 Hooks.once("ready", () => {
   const version = game.system?.version ?? "unknown";
+  // Public API for macros / modules: game.gluniverse.roll(actor), etc.
+  (game as any).gluniverse = {
+    openRollDialog,
+    rouseCheck,
+    remorseCheck,
+    frenzyCheck,
+  };
   console.log(`${SYSTEM_ID} | Ready (v${version})`);
 });

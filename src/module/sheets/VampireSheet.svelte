@@ -5,6 +5,8 @@
   import DamageTrack from "../components/DamageTrack.svelte";
   import ItemControls from "../components/ItemControls.svelte";
   import { createItem, editItem, deleteItem } from "../apps/actor-items.ts";
+  import { openRollDialog } from "../apps/RollDialogApp.ts";
+  import { rouseCheck, remorseCheck, frenzyCheck } from "../dice/checks.ts";
 
   /* eslint-disable @typescript-eslint/no-explicit-any */
   interface Props {
@@ -82,6 +84,11 @@
     dragOver = false;
     app.glHandleDrop?.(event);
   }
+
+  // --- rolls ----------------------------------------------------------------
+  const rollAttr = (k: string) => openRollDialog(doc, { attribute: k });
+  const rollSkill = (k: string) => openRollDialog(doc, { skill: k });
+  const openPool = () => openRollDialog(doc, {});
 </script>
 
 <div
@@ -105,6 +112,7 @@
           onchange={(e) => doc.update({ name: e.currentTarget.value })}
         />
       </div>
+      <button class="roll-cta" onclick={openPool} title="Build a dice pool">Roll Pool</button>
       <div class="facts">
         <label class="fact">
           <span class="fk">Clan</span>
@@ -156,7 +164,7 @@
             <div class="col-h">{prettify(cat)}</div>
             {#each keys as k (k)}
               <div class="row">
-                <span class="at-name">{label("Attributes", k)}</span>
+                <button class="at-name roll-trait" title="Roll {label('Attributes', k)}" onclick={() => rollAttr(k)}>{label("Attributes", k)}</button>
                 <DotRating
                   value={sys.attributes[k].value}
                   onchange={(n) => up(`system.attributes.${k}.value`, n)}
@@ -174,14 +182,22 @@
             <div class="col-h">{prettify(cat)}</div>
             {#each keys as k (k)}
               {@const spec = specText(k)}
-              <div class="sk-block">
+              <div class="sk-block gl-hoverable">
                 <div class="row">
-                  <button
-                    class="sk-name"
-                    class:has-spec={spec}
-                    title={spec || "Add specialty"}
-                    onclick={() => (editingSpec = editingSpec === k ? null : k)}
-                  >{label("Skills", k)}</button>
+                  <span class="sk-left">
+                    <button
+                      class="sk-name roll-trait"
+                      class:has-spec={spec}
+                      title="Roll {label('Skills', k)}"
+                      onclick={() => rollSkill(k)}
+                    >{label("Skills", k)}</button>
+                    <button
+                      class="spec-edit"
+                      title="Edit specialties"
+                      aria-label="Edit specialties"
+                      onclick={() => (editingSpec = editingSpec === k ? null : k)}
+                    >✎</button>
+                  </span>
                   <DotRating
                     value={sys.skills[k].value}
                     size={11}
@@ -218,7 +234,10 @@
       </div>
 
       <div class="trk">
-        <div class="trk-h"><span class="l">Willpower</span></div>
+        <div class="trk-h">
+          <span class="l">Willpower</span>
+          <button class="chk-btn" onclick={() => frenzyCheck(doc)} title="Resist Frenzy">Frenzy</button>
+        </div>
         <DamageTrack
           superficial={sys.willpower.superficial}
           aggravated={sys.willpower.aggravated}
@@ -230,7 +249,10 @@
       <div class="rail-div"></div>
 
       <div class="trk">
-        <div class="trk-h"><span class="l blood">Hunger</span></div>
+        <div class="trk-h">
+          <span class="l blood">Hunger</span>
+          <button class="chk-btn" onclick={() => rouseCheck(doc)} title="Rouse the Blood">Rouse</button>
+        </div>
         <div class="diamonds">
           {#each Array.from({ length: 5 }, (_, i) => i) as i (i)}
             <span
@@ -253,6 +275,7 @@
             Stains
             <button class="mini-btn" onclick={() => bumpStain(-1)} aria-label="Decrease stains">–</button>
             <button class="mini-btn" onclick={() => bumpStain(1)} aria-label="Increase stains">+</button>
+            <button class="chk-btn" onclick={() => remorseCheck(doc)} title="Remorse check">Remorse</button>
           </span>
         </div>
         <div class="humanity">
@@ -695,6 +718,72 @@
     font-family: var(--gl-semi);
     font-weight: 500;
     font-size: 14px;
+  }
+  .roll-trait {
+    background: transparent;
+    border: none;
+    padding: 0;
+    color: var(--gl-ink);
+    cursor: pointer;
+    text-align: left;
+    border-bottom: 1px solid transparent;
+  }
+  .roll-trait:hover {
+    color: var(--gl-blood);
+    border-bottom-color: var(--gl-blood);
+  }
+  .roll-cta {
+    align-self: center;
+    font-family: var(--gl-cond);
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    font-size: 11px;
+    color: var(--gl-parch);
+    background: var(--gl-blood);
+    border: 1px solid var(--gl-blood);
+    padding: 7px 14px;
+    cursor: pointer;
+  }
+  .roll-cta:hover {
+    background: var(--gl-blood-bright);
+  }
+  .sk-left {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .spec-edit {
+    background: transparent;
+    border: none;
+    color: var(--gl-muted);
+    cursor: pointer;
+    font-size: 11px;
+    padding: 0 2px;
+    opacity: 0;
+    transition: opacity 0.12s;
+  }
+  .gl-hoverable:hover .spec-edit,
+  .spec-edit:focus-visible {
+    opacity: 1;
+  }
+  .spec-edit:hover {
+    color: var(--gl-blood);
+  }
+  .chk-btn {
+    font-family: var(--gl-cond);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-size: 9px;
+    color: var(--gl-blood);
+    background: transparent;
+    border: 1px solid var(--gl-line);
+    border-radius: 3px;
+    padding: 1px 7px;
+    cursor: pointer;
+  }
+  .chk-btn:hover {
+    border-color: var(--gl-blood);
+    background: color-mix(in srgb, var(--gl-blood) 8%, transparent);
   }
   .sk-block {
     margin-bottom: 6px;
