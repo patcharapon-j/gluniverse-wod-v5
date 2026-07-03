@@ -11,6 +11,8 @@
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
+import { SYSTEM_ID } from "../config.ts";
+
 export type V5Outcome =
   | "critical"
   | "messy"
@@ -126,6 +128,10 @@ export async function rollPool(
     // With both kinds present the hunger term is index 1; if there are no normal
     // dice the single term is the hunger pool.
     const isHunger = (normal > 0 && ti === 1) || normal === 0;
+    // Tag the term so Dice So Nice colours Hunger dice with the blood preset.
+    term.options = term.options ?? {};
+    term.options.appearance = { colorset: isHunger ? "gl-hunger" : "gl-vampire", system: SYSTEM_ID };
+    if (isHunger) term.options.flavor = "Hunger";
     for (const r of term.results) dice.push({ value: r.result, hunger: isHunger });
   });
 
