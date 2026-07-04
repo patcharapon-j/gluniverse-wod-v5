@@ -288,6 +288,38 @@
         (!advSearch.trim() || a.name.toLowerCase().includes(advSearch.trim().toLowerCase())),
     ),
   );
+
+  // The Merit/Flaw lists are long, so group them by category (Haven, Feeding,
+  // Mythic, …); Loresheets group by their source book. Categories render in
+  // rulebook order, with anything unrecognized falling to the end.
+  const CATEGORY_ORDER = [
+    "Backgrounds", "Haven", "Looks", "Substance Use", "Archaic", "Bonding", "Feeding",
+    "Mythic", "Psychological", "Miscellaneous", "Blood Ties", "Contagion",
+    "Ingrained Discipline", "Caitiff", "Thin-Blood", "Ghoul", "Cults", "Coterie",
+  ];
+  let advOpenGroups = $state<Record<string, boolean>>({});
+  const advGroups = $derived.by(() => {
+    const byLore = advTab === "loresheet";
+    const map = new Map<string, any[]>();
+    for (const a of advList) {
+      const key = (byLore ? a.system?.source : a.system?.category) || "Other";
+      (map.get(key) ?? map.set(key, []).get(key)!).push(a);
+    }
+    const rank = (k: string) => {
+      if (byLore) return k === "Core" ? -1 : 0; // Core first, rest alphabetical
+      const i = CATEGORY_ORDER.indexOf(k);
+      return i < 0 ? 999 : i;
+    };
+    return [...map.keys()]
+      .sort((a, b) => rank(a) - rank(b) || a.localeCompare(b))
+      .map((name) => ({ name, items: map.get(name)! }));
+  });
+  const advGroupOpen = (name: string) =>
+    !!advSearch.trim() || advOpenGroups[`${advTab}:${name}`] !== false;
+  const toggleAdvGroup = (name: string) => {
+    const k = `${advTab}:${name}`;
+    advOpenGroups[k] = advOpenGroups[k] === false;
+  };
   const EQ_TABS = [
     { key: "weapon", label: "Weapons" },
     { key: "armor", label: "Armor" },
@@ -645,37 +677,51 @@
       {:else if advList.length === 0}
         <p class="loading">Nothing here{advSearch ? ` matching “${advSearch}”` : ""}.</p>
       {:else}
-        {#each advList as a (a.id)}
-          {@const owned = ownedAdv(a)}
-          <div class="row" class:owned>
-            <span class="row-main">
-              <span class="row-name" class:flaw={advTab === "flaw"}>{a.name}</span>
-              <span class="row-detail">
-                {#if (a.system.maxValue ?? 5) !== (a.system.value ?? 1)}<b>Dots</b> {a.system.value}–{a.system.maxValue}{:else}<b>Dots</b> {a.system.value}{/if}
-              </span>
-              {#if a.system.description}<span class="row-desc">{@html a.system.description}</span>{/if}
-            </span>
-            {#if owned}
-              {@const max = owned.system.maxValue || 5}
-              {@const counted = ["merit", "background"].includes(advTab)}
-              <span class="numsel">
-                {#each Array.from({ length: max }, (_, i) => i + 1) as n (n)}
-                  <button
-                    class="ns"
-                    class:sel={owned.system.value === n}
-                    class:dep={owned.system.value !== n && counted && advDots - owned.system.value + n > rules.advantageDots}
-                    title={counted && advDots - owned.system.value + n > rules.advantageDots
-                      ? `Set to ${n} — exceeds the creation budget`
-                      : `Set to ${n}`}
-                    onclick={() => doc.items.get(owned.id)?.update({ "system.value": n })}
-                  >{n}</button>
-                {/each}
-              </span>
-            {/if}
-            <button class="row-add" class:on={!!owned} onclick={() => toggle(owned, a)}>
-              {owned ? "✕ Remove" : "+ Add"}
+        {@const grouped = advGroups.length > 1}
+        {#each advGroups as g (g.name)}
+          {@const openG = advGroupOpen(g.name)}
+          {#if grouped}
+            {@const ownedCount = g.items.filter((x) => ownedAdv(x)).length}
+            <button class="adv-grp" class:open={openG} onclick={() => toggleAdvGroup(g.name)}>
+              <span class="grp-caret">▸</span>
+              <span class="grp-name">{g.name}</span>
+              <span class="grp-count">{#if ownedCount}<b>{ownedCount}</b> / {/if}{g.items.length}</span>
             </button>
-          </div>
+          {/if}
+          {#if openG}
+            {#each g.items as a (a.id)}
+              {@const owned = ownedAdv(a)}
+              <div class="row" class:owned class:ingrp={grouped}>
+                <span class="row-main">
+                  <span class="row-name" class:flaw={advTab === "flaw"}>{a.name}</span>
+                  <span class="row-detail">
+                    {#if (a.system.maxValue ?? 5) !== (a.system.value ?? 1)}<b>Dots</b> {a.system.value}–{a.system.maxValue}{:else}<b>Dots</b> {a.system.value}{/if}
+                  </span>
+                  {#if a.system.description}<span class="row-desc">{@html a.system.description}</span>{/if}
+                </span>
+                {#if owned}
+                  {@const max = owned.system.maxValue || 5}
+                  {@const counted = ["merit", "background"].includes(advTab)}
+                  <span class="numsel">
+                    {#each Array.from({ length: max }, (_, i) => i + 1) as n (n)}
+                      <button
+                        class="ns"
+                        class:sel={owned.system.value === n}
+                        class:dep={owned.system.value !== n && counted && advDots - owned.system.value + n > rules.advantageDots}
+                        title={counted && advDots - owned.system.value + n > rules.advantageDots
+                          ? `Set to ${n} — exceeds the creation budget`
+                          : `Set to ${n}`}
+                        onclick={() => doc.items.get(owned.id)?.update({ "system.value": n })}
+                      >{n}</button>
+                    {/each}
+                  </span>
+                {/if}
+                <button class="row-add" class:on={!!owned} onclick={() => toggle(owned, a)}>
+                  {owned ? "✕ Remove" : "+ Add"}
+                </button>
+              </div>
+            {/each}
+          {/if}
         {/each}
       {/if}
 
@@ -1253,6 +1299,49 @@
   }
 
   /* generic catalogue row */
+  /* category group headers in the Advantages step */
+  .adv-grp {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    margin-top: 10px;
+    padding: 5px 4px;
+    background: var(--gl-parch-raise);
+    border: none;
+    border-bottom: 1px solid var(--gl-line);
+    cursor: pointer;
+    text-align: left;
+  }
+  .adv-grp:hover {
+    background: color-mix(in srgb, var(--gl-blood) 6%, var(--gl-parch-raise));
+  }
+  .grp-caret {
+    color: var(--gl-muted);
+    font-size: 10px;
+    transition: transform 0.12s;
+  }
+  .adv-grp.open .grp-caret {
+    transform: rotate(90deg);
+  }
+  .grp-name {
+    flex: 1;
+    font-family: var(--gl-cond);
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--gl-ink);
+  }
+  .grp-count {
+    font-family: var(--gl-cond);
+    font-size: 10px;
+    letter-spacing: 1px;
+    color: var(--gl-muted);
+  }
+  .grp-count b {
+    color: var(--gl-good);
+  }
   .row {
     display: flex;
     align-items: flex-start;
@@ -1260,6 +1349,9 @@
     padding: 6px 2px 6px 20px;
     border-top: 1px dotted var(--gl-line-soft);
     font-size: 12px;
+  }
+  .row.ingrp {
+    padding-left: 28px;
   }
   .row.owned {
     background: color-mix(in srgb, var(--gl-good) 7%, transparent);

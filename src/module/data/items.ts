@@ -83,6 +83,9 @@ export class AdvantageData extends (foundry.abstract.TypeDataModel as any) {
       // Optional specifier shown parenthetically after the name, e.g. the prey a
       // Prey Exclusion names, or which Discipline a Discipline flaw ingrains.
       detail: str(),
+      // Grouping label (e.g. "Haven", "Feeding", "Mythic") used to organize the
+      // long Merit/Flaw lists in the character builder.
+      category: str(),
     };
   }
 }
