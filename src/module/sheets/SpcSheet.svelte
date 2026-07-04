@@ -1,6 +1,8 @@
 <script lang="ts">
   import DotRating from "../components/DotRating.svelte";
   import EffectsPanel from "../components/EffectsPanel.svelte";
+  import Portrait from "../components/Portrait.svelte";
+  import { pickImage } from "../apps/image.ts";
   import { rollPool } from "../dice/roll-v5.ts";
   import { postRollCard } from "../dice/chat.ts";
 
@@ -61,9 +63,12 @@
 <div class="gl-spc">
   <header class="hdr">
     <div class="spine"></div>
-    <div class="eyebrow">Antagonist · Storyteller Character</div>
-    <input class="name" value={snap.name} onchange={(e) => doc.update({ name: e.currentTarget.value })} />
-    <input class="archetype" placeholder="Archetype / concept…" value={sys.archetype} onchange={(e) => up("system.archetype", e.currentTarget.value)} />
+    <Portrait img={snap.img} name={snap.name} editable onedit={() => pickImage(doc)} />
+    <div class="hdr-id">
+      <div class="eyebrow">Antagonist · Storyteller Character</div>
+      <input class="name" value={snap.name} onchange={(e) => doc.update({ name: e.currentTarget.value })} />
+      <input class="archetype" placeholder="Archetype / concept…" value={sys.archetype} onchange={(e) => up("system.archetype", e.currentTarget.value)} />
+    </div>
   </header>
 
   <div class="grid">
@@ -149,6 +154,16 @@
     padding: 22px 30px 16px;
     border-bottom: 2px solid var(--gl-ink);
     position: relative;
+    display: flex;
+    gap: 18px;
+    align-items: stretch;
+  }
+  .hdr-id {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
   }
   .spine {
     position: absolute;

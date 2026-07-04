@@ -12,13 +12,20 @@ import RollDialog from "../sheets/RollDialog.svelte";
 import { rollPool } from "../dice/roll-v5.ts";
 import { postRollCard, rollCardHTML } from "../dice/chat.ts";
 import { rouseCheck, bloodSurgeBonus } from "../dice/checks.ts";
+import { resolvePool } from "../dice/pool.ts";
 import { getSetting, SETTINGS } from "../settings.ts";
 
 export interface RollSeed {
   attribute?: string;
   skill?: string;
+  /** Preselect a Discipline (by key) to add the actor's dots to the pool. */
+  discipline?: string;
   flavor?: string;
   difficulty?: number;
+  /** A pre-resolved base pool (e.g. a power's dice pool), added before pickers. */
+  fixedPool?: number;
+  /** Human label for a pre-resolved base pool. */
+  poolLabel?: string;
 }
 
 const AppV2 = foundry.applications.api.ApplicationV2;
@@ -69,7 +76,7 @@ export class RollDialogApp extends AppV2 {
       await rouseCheck(this._actor, { label: "Blood Surge — Rouse" });
     }
     const { result, roll } = await rollPool({ pool, hunger: o.hunger, difficulty: o.difficulty });
-    await postRollCard(this._actor, result, roll, { flavor: o.flavor });
+    await postRollCard(this._actor, result, roll, { flavor: o.flavor, bloodSurge: o.bloodSurge });
     await this.close();
   }
 
@@ -93,6 +100,30 @@ export interface RollDialogResult {
 /** Convenience: open the pool dialog for an actor, seeded from a clicked trait. */
 export function openRollDialog(actor: any, seed: RollSeed = {}): void {
   new RollDialogApp(actor, seed).render(true);
+}
+
+/**
+ * Roll a Discipline power: resolve its written pool ("Resolve + Auspex") against
+ * the actor into a base number, then open the dialog seeded with that pool so the
+ * player can still add Hunger, difficulty, specialties or a Blood Surge.
+ */
+export function rollPower(actor: any, power: any): void {
+  const poolStr: string = power?.system?.pool ?? "";
+  if (poolStr) {
+    const { total } = resolvePool(actor, poolStr);
+    openRollDialog(actor, { fixedPool: total, poolLabel: poolStr, flavor: power.name });
+  } else {
+    // No written pool: seed the power's Discipline so its dots are added.
+    openRollDialog(actor, { discipline: power?.system?.discipline, flavor: power.name });
+  }
+}
+
+/** Roll a bare Discipline: open the dialog with that Discipline's dots added. */
+export function rollDiscipline(actor: any, discipline: any): void {
+  openRollDialog(actor, {
+    discipline: discipline?.system?.discipline,
+    flavor: discipline?.name,
+  });
 }
 
 // Re-export so the sheet can preview a card without a full roll (unused stub kept

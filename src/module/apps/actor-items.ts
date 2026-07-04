@@ -9,6 +9,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { prettify } from "../components/labels.ts";
+import { CLANS, PREDATOR_TYPES } from "../config.ts";
 
 /** Foundry's v14 drag-data reader, with a graceful fallback for older paths. */
 function getDragEventData(event: DragEvent): any {
@@ -63,12 +64,21 @@ export async function deleteItem(actor: any, id: string): Promise<void> {
 }
 
 /**
- * Handle a drop onto an actor sheet. Sorts within the same actor, otherwise
- * creates the dropped item on this actor. Returns true if handled.
+ * Handle a drop onto an actor sheet. Understands three cases:
+ *  - a JournalEntry that names a clan or predator type → set that field;
+ *  - an Item already owned here → reorder it;
+ *  - any other Item → create it, de-duplicating Disciplines and linking Powers
+ *    to their parent Discipline instance on this actor.
+ * Returns true if handled.
  */
 export async function handleActorDrop(actor: any, event: DragEvent): Promise<boolean> {
   const data = getDragEventData(event);
-  if (!data || data.type !== "Item") return false;
+  if (!data) return false;
+
+  if (data.type === "JournalEntry" || data.type === "JournalEntryPage") {
+    return handleLoreDrop(actor, data);
+  }
+  if (data.type !== "Item") return false;
 
   const item = await Item.implementation.fromDropData(data);
   if (!item) return false;
@@ -78,8 +88,89 @@ export async function handleActorDrop(actor: any, event: DragEvent): Promise<boo
     return sortOnDrop(actor, item, event);
   }
 
-  await actor.createEmbeddedDocuments("Item", [item.toObject()]);
+  const obj = item.toObject();
+
+  // Disciplines: never keep two of the same on one actor.
+  if (obj.type === "discipline") {
+    const existing = findDiscipline(actor, obj.system?.discipline);
+    if (existing) {
+      // Merge the higher rating rather than creating a duplicate row.
+      const better = Math.max(existing.system?.value ?? 0, obj.system?.value ?? 0);
+      if (better !== existing.system?.value) await existing.update({ "system.value": better });
+      return true;
+    }
+  }
+
+  // Powers: attach to (or create) their parent Discipline on this actor.
+  if (obj.type === "power") {
+    const parentId = await ensureDisciplineFor(actor, obj.system?.discipline);
+    if (parentId) obj.system = { ...obj.system, parentDiscipline: parentId };
+  }
+
+  await actor.createEmbeddedDocuments("Item", [obj]);
   return true;
+}
+
+/** Find an owned Discipline item by its discipline key. */
+function findDiscipline(actor: any, discipline: string | undefined): any {
+  if (!discipline) return null;
+  return actor.items.find(
+    (i: any) => i.type === "discipline" && i.system?.discipline === discipline,
+  );
+}
+
+/** Return the id of the actor's Discipline for `discipline`, creating it if absent. */
+async function ensureDisciplineFor(actor: any, discipline: string | undefined): Promise<string | null> {
+  if (!discipline) return null;
+  const found = findDiscipline(actor, discipline);
+  if (found) return found.id;
+  const created = await actor.createEmbeddedDocuments("Item", [
+    { name: prettify(discipline), type: "discipline", system: { discipline, value: 0 } },
+  ]);
+  return created?.[0]?.id ?? null;
+}
+
+/**
+ * A dropped lore JournalEntry sets the matching field. We first trust an explicit
+ * flag written into the compendium, then fall back to matching the entry name
+ * against the known clan / predator keys and labels.
+ */
+async function handleLoreDrop(actor: any, data: any): Promise<boolean> {
+  const doc: any = data.uuid ? await fromUuid(data.uuid) : null;
+  const entry = doc?.documentName === "JournalEntryPage" ? doc.parent : doc;
+  if (!entry) return false;
+
+  const SYSTEM_ID = "gluniverse-wod-v5";
+  const flags = entry.flags?.[SYSTEM_ID] ?? {};
+  const name = String(entry.name ?? "");
+
+  const clanKey = flags.clanKey ?? matchKey(name, "clan");
+  if (clanKey && actor.system?.clan !== undefined) {
+    await actor.update({ "system.clan": clanKey });
+    return true;
+  }
+  const predKey = flags.predatorKey ?? matchKey(name, "predator");
+  if (predKey && actor.system?.predator !== undefined) {
+    await actor.update({ "system.predator": predKey });
+    return true;
+  }
+  return false;
+}
+
+const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+
+/** Match a display name to a CLANS / PREDATOR_TYPES key, via label or key. */
+function matchKey(name: string, kind: "clan" | "predator"): string | null {
+  const target = normalize(name);
+  const list = kind === "clan" ? CLANS : PREDATOR_TYPES;
+  const group = kind === "clan" ? "Clans" : "PredatorTypes";
+  for (const key of list) {
+    if (normalize(key) === target) return key;
+    if (normalize(prettify(key)) === target) return key;
+    const loc = game.i18n?.localize?.(`GLUNIVERSE.${group}.${key}`);
+    if (loc && normalize(loc) === target) return key;
+  }
+  return null;
 }
 
 /** Sort an owned item to the position of the `[data-item-id]` it was dropped on. */

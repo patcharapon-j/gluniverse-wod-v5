@@ -14,6 +14,7 @@ export const SETTINGS = {
   automateHunger: "automateHunger",
   automateRemorse: "automateRemorse",
   defaultDifficulty: "defaultDifficulty",
+  gmHud: "gmHud",
 } as const;
 
 export type SettingKey = (typeof SETTINGS)[keyof typeof SETTINGS];
@@ -56,5 +57,14 @@ export function registerSettings(): void {
     type: Number,
     range: { min: 1, max: 10, step: 1 },
     default: 2,
+  });
+
+  settings.register(SYSTEM_ID, SETTINGS.gmHud, {
+    name: "GLUNIVERSE.Settings.GmHud.Name",
+    hint: "GLUNIVERSE.Settings.GmHud.Hint",
+    scope: "client",
+    config: true,
+    type: Boolean,
+    default: true,
   });
 }

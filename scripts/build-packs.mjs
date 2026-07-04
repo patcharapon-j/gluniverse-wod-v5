@@ -79,7 +79,7 @@ function journalDoc(packName, entry) {
     pages,
     folder: null,
     sort: 0,
-    flags: {},
+    flags: entry.flags ?? {},
   };
   if (entry.img) doc.img = entry.img;
   return doc;

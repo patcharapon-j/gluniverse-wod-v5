@@ -8,8 +8,9 @@
     attributes: any;
     onrate: (key: string, n: number) => void;
     onroll?: (key: string) => void;
+    readonly?: boolean;
   }
-  let { attributes, onrate, onroll }: Props = $props();
+  let { attributes, onrate, onroll, readonly = false }: Props = $props();
 </script>
 
 <div class="triad">
@@ -23,7 +24,7 @@
           {:else}
             <span class="at-name">{label("Attributes", k)}</span>
           {/if}
-          <DotRating value={attributes[k].value} onchange={(n) => onrate(k, n)} />
+          <DotRating value={attributes[k].value} size={13} {readonly} onchange={(n) => onrate(k, n)} />
         </div>
       {/each}
     </div>
@@ -34,8 +35,8 @@
   .triad {
     display: grid;
     grid-template-columns: 1fr 1fr 1fr;
-    gap: 26px;
-    margin-bottom: 30px;
+    gap: 14px 20px;
+    margin-bottom: 18px;
   }
   .col-h {
     font-family: var(--gl-cond);
@@ -44,13 +45,13 @@
     font-size: 10px;
     text-align: center;
     color: var(--gl-muted);
-    margin-bottom: 10px;
+    margin-bottom: 7px;
   }
   .row {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 8px;
+    margin-bottom: 4px;
   }
   .at-name {
     font-family: var(--gl-semi);
