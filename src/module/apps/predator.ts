@@ -27,11 +27,12 @@ interface RecordedGrants {
 }
 
 /** Build an advantage item object from a compendium doc (falls back to bare). */
-function makeAdvantage(name: string, kind: string, dots: number, advByName: Map<string, any>): any {
+function makeAdvantage(name: string, kind: string, dots: number, detail: string, advByName: Map<string, any>): any {
   const src = advByName.get(name);
   const base = src ? src.toObject() : { name, type: "advantage", system: { kind } };
   delete base._id;
   base.system = { ...(base.system ?? {}), kind: base.system?.kind ?? kind, value: dots };
+  if (detail) base.system.detail = detail;
   base.flags = { ...(base.flags ?? {}), [SYSTEM_ID]: { ...(base.flags?.[SYSTEM_ID] ?? {}), fromPredator: true } };
   return base;
 }
@@ -91,11 +92,13 @@ export async function applyPredatorGrants(
   const skillSpecialties: Record<string, string[]> = {};
   // Aggregate advantage grants by name so e.g. Trapdoor's fixed Haven dot and a
   // pooled Haven dot become one two-dot Haven, not two separate items.
-  const advGrants = new Map<string, { kind: string; dots: number }>();
-  const grantAdvantage = (name: string, kind: string, dots: number) => {
+  const advGrants = new Map<string, { kind: string; dots: number; detail: string }>();
+  const grantAdvantage = (name: string, kind: string, dots: number, detail = "") => {
     const prev = advGrants.get(name);
-    if (prev) prev.dots += dots;
-    else advGrants.set(name, { kind, dots });
+    if (prev) {
+      prev.dots += dots;
+      if (!prev.detail && detail) prev.detail = detail;
+    } else advGrants.set(name, { kind, dots, detail });
   };
 
   const benefits = profile.benefits;
@@ -115,11 +118,11 @@ export async function applyPredatorGrants(
       if (!key) continue;
       rec.disciplines.push({ key, dots: b.dots });
     } else if (b.kind === "advantage") {
-      grantAdvantage(b.name, b.advKind, b.dots);
+      grantAdvantage(b.name, b.advKind, b.dots, b.note ?? "");
     } else if (b.kind === "advantageChoice") {
       const opt = b.options[typeof choice === "number" ? choice : 0] ?? b.options[0];
       if (!opt) continue;
-      grantAdvantage(opt.name, b.advKind, opt.dots);
+      grantAdvantage(opt.name, b.advKind, opt.dots, opt.note ?? "");
     } else if (b.kind === "pool") {
       const alloc: Record<string, number> = choice ?? {};
       for (const name of b.among) {
@@ -132,7 +135,7 @@ export async function applyPredatorGrants(
   }
 
   const newItems = [...advGrants.entries()].map(([name, g]) =>
-    makeAdvantage(name, g.kind, Math.min(5, g.dots), advByName),
+    makeAdvantage(name, g.kind, Math.min(5, g.dots), g.detail, advByName),
   );
 
   const update: Record<string, unknown> = {};

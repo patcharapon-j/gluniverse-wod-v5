@@ -348,6 +348,7 @@
                 <button class="adv-lbl reveal" class:flaw={grp.kind === "flaw"} onclick={() => reveal(a.id)} title="Show detail">
                   <span class="adv-tag" data-kind={grp.kind}>{grp.label.slice(0, 1)}</span>
                   <b>{a.name}</b>
+                  {#if a.system.detail}<span class="adv-detail">({a.system.detail})</span>{/if}
                 </button>
                 <DotRating value={a.system.value} max={a.system.maxValue || 5} size={13} readonly={!editMode} onchange={(n) => upItem(a.id, "system.value", n)} />
                 {#if editMode}<ItemControls onedit={() => editItem(doc, a.id)} ondelete={() => deleteItem(doc, a.id)} />{/if}
@@ -1016,6 +1017,9 @@
     border: none;
     padding: 0;
     text-align: left;
+    /* Foundry styles bare buttons as centered flex boxes; force names to the
+       left edge so Disciplines read the same as Powers, advantages & gear. */
+    justify-content: flex-start;
     cursor: pointer;
     color: inherit;
     font: inherit;
@@ -1163,6 +1167,12 @@
     color: var(--gl-muted);
     font-size: 11px;
     margin-left: 5px;
+  }
+  .adv-detail {
+    font-size: 11px;
+    font-style: italic;
+    color: var(--gl-gold);
+    margin-left: 4px;
   }
   .adv-lbl.flaw b {
     color: var(--gl-blood);

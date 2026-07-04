@@ -118,6 +118,10 @@
         <span>Max</span>
         <input type="number" min="0" max="5" value={sys.maxValue} onchange={(e) => up("system.maxValue", Number(e.currentTarget.value))} />
       </label>
+      <label class="field wide">
+        <span>Detail</span>
+        <input value={sys.detail} placeholder="e.g. prey type, named Discipline" onchange={(e) => up("system.detail", e.currentTarget.value)} />
+      </label>
     {/if}
 
     {#if type === "weapon"}
