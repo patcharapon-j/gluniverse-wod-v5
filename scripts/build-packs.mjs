@@ -16,7 +16,7 @@ import { createHash } from "node:crypto";
 import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { compilePack } from "@foundryvtt/foundryvtt-cli";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -90,7 +90,7 @@ async function main() {
   const summary = [];
 
   for (const pack of PACKS) {
-    const mod = await import(join(SRC, pack.module));
+    const mod = await import(pathToFileURL(join(SRC, pack.module)).href);
     const entries = mod.default;
     if (!Array.isArray(entries)) {
       throw new Error(`${pack.module} must default-export an array (got ${typeof entries})`);

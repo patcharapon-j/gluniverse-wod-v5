@@ -1,6 +1,12 @@
 node_modules/
 dist/
 system.zip
+
+# Local dev: build artifacts junctioned/copied into the repo root so Foundry
+# (which loads this folder directly) finds them. Anchored so src/module is safe.
+/module/
+/packs/
+/styles/gluniverse-components.css
 *.log
 .DS_Store
 .idea/
