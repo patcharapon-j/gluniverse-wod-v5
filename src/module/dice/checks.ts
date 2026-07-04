@@ -16,7 +16,8 @@ export async function rouseCheck(
   actor: any,
   opts: { reroll?: boolean; label?: string } = {},
 ): Promise<boolean> {
-  const roll = await new Roll(opts.reroll ? "2d10kh" : "1d10").evaluate();
+  // Rouse checks ride the Hunger die so the 3D dice use the blood preset.
+  const roll = await new Roll(opts.reroll ? "2dhkh" : "1dh").evaluate();
   const dice: number[] = roll.dice[0].results.map((r: any) => r.result);
   const best = Math.max(...dice);
   const success = best >= 6;
@@ -57,7 +58,7 @@ export async function remorseCheck(actor: any): Promise<boolean> {
   const stains = actor.system.humanity?.stains ?? 0;
   const pool = Math.max(1, 10 - humanity - stains);
 
-  const roll = await new Roll(`${pool}d10`).evaluate();
+  const roll = await new Roll(`${pool}dv`).evaluate();
   const dice: number[] = roll.dice[0].results.map((r: any) => r.result);
   const success = dice.some((d) => d >= 6);
 

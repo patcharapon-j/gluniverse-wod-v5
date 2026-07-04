@@ -45,8 +45,9 @@ export class RollDialogApp extends AppV2 {
   constructor(actor: any, seed: RollSeed = {}, options: Record<string, unknown> = {}) {
     super(options);
     this._actor = actor;
-    // Seed an unset difficulty from the client's preferred default.
-    this._seed = { difficulty: getSetting(SETTINGS.defaultDifficulty, 2), ...seed };
+    // Seed an unset difficulty from the client's preferred default (0 = none:
+    // the card just reports successes).
+    this._seed = { difficulty: getSetting(SETTINGS.defaultDifficulty, 0), ...seed };
   }
 
   async _renderHTML(): Promise<null> {
@@ -115,6 +116,21 @@ export function rollPower(actor: any, power: any): void {
   } else {
     // No written pool: seed the power's Discipline so its dots are added.
     openRollDialog(actor, { discipline: power?.system?.discipline, flavor: power.name });
+  }
+}
+
+/**
+ * Roll a weapon attack: resolve its written pool ("Strength + Brawl") against the
+ * actor into a base number; with no written pool, open a blank dialog so the
+ * player builds the attack pool themselves.
+ */
+export function rollWeapon(actor: any, weapon: any): void {
+  const poolStr: string = weapon?.system?.pool ?? "";
+  if (poolStr) {
+    const { total } = resolvePool(actor, poolStr);
+    openRollDialog(actor, { fixedPool: total, poolLabel: poolStr, flavor: weapon.name });
+  } else {
+    openRollDialog(actor, { flavor: weapon.name });
   }
 }
 

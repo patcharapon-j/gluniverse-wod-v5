@@ -59,6 +59,13 @@ function svelteSheetMixin(Base: any, component: Component<any>, opts: SvelteShee
       return handleActorDrop(this.document, event);
     }
 
+    /**
+     * Neutralize ActorSheetV2's built-in drop handling (v13+). The Svelte root
+     * owns drops via {@link glHandleDrop}; the bubbled event would otherwise
+     * reach the core handler too and create the document a second time.
+     */
+    async _onDrop(_event: DragEvent): Promise<void> {}
+
     async _onClose(options: unknown): Promise<void> {
       if (this._gl_svelte) {
         unmount(this._gl_svelte);

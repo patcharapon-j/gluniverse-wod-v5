@@ -24,7 +24,7 @@
   async function rollFlat(pool: number, flavor: string) {
     const p = Math.max(0, pool);
     if (p === 0) return;
-    const { result, roll } = await rollPool({ pool: p, hunger: sys.hunger ?? 0, difficulty: 1 });
+    const { result, roll } = await rollPool({ pool: p, hunger: sys.hunger ?? 0 });
     await postRollCard(doc, result, roll, { flavor });
   }
 

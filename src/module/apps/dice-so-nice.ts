@@ -1,42 +1,53 @@
 /**
- * Dice So Nice! integration. Registers a GLUniverse dice system with two d10
- * presets — bone-on-black regular dice and bone-on-blood Hunger dice — using
- * original SVG face art (a maker's mark on the 10, a blood drop on the Hunger 1).
- * All of this is a no-op when Dice So Nice isn't installed; the {@link rollPool}
- * terms are tagged so the module colours Hunger dice red automatically.
+ * Dice So Nice! integration for the system's custom dice types: `dv` (regular)
+ * and `dh` (Hunger), both ten-sided (see ../dice/terms.ts). Presets are keyed to
+ * the die type on a d10 shape — black resin with gold glyphs for regular
+ * dice, blood red with white glyphs for Hunger. Faces reuse the glyph PNGs as bump maps
+ * for relief, and as emissive maps on the faces that matter: the 10 on regular
+ * dice, the 1 and 10 on Hunger dice. No-op when Dice So Nice isn't installed.
  */
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { SYSTEM_ID } from "../config.ts";
 
-const INK = "#161009";
 const BONE = "#efe8da";
 const BLOOD = "#7d1013";
 const BLOOD_LIGHT = "#f0d7d7";
 
-/** A d10 face rendered as an SVG data URI. Special glyphs on 10 (and Hunger 1). */
-function face(label: string, fg: string, glyph?: "mark" | "drop"): string {
-  const inner = glyph === "mark"
-    ? `<path d="M50 18 L62 44 L50 40 L38 44 Z" fill="${fg}"/><circle cx="50" cy="62" r="12" fill="none" stroke="${fg}" stroke-width="5"/>`
-    : glyph === "drop"
-      ? `<path d="M50 20 C50 20 74 52 74 66 a24 24 0 1 1 -48 0 C26 52 50 20 50 20 Z" fill="${fg}"/>`
-      : `<text x="50" y="50" font-family="Oswald, Arial Narrow, sans-serif" font-size="58" font-weight="600" fill="${fg}" text-anchor="middle" dominant-baseline="central">${label}</text>`;
-  const svg =
-    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">${inner}</svg>`;
-  return `data:image/svg+xml;base64,${btoa(svg)}`;
+/**
+ * Glyph faces are pre-rasterized PNGs (see scripts/build-dice-icons.mjs): DSN's
+ * texture loader wants raster image paths — `data:` URIs render as literal text
+ * and SVGs fail to load.
+ */
+const ICON = (name: string) => `systems/${SYSTEM_ID}/assets/dice/${name}.png`;
+
+/**
+ * Face labels, values 1..10: glyphs on 6+ (and Hunger 1), blank failures.
+ * Regular dice use the gold glyph variants; Hunger dice stay white.
+ */
+function labels(hunger: boolean): string[] {
+  const out: string[] = [];
+  for (let n = 1; n <= 10; n++) {
+    if (n === 10) out.push(ICON(hunger ? "messy" : "crit-gold"));
+    else if (n >= 6) out.push(ICON(hunger ? "mark" : "mark-gold"));
+    else if (n === 1 && hunger) out.push(ICON("bestial"));
+    else out.push(" "); // failure faces are blank, like the real dice
+  }
+  return out;
 }
 
-/** Ten face labels for a d10 (index 0 = the "0"/10 face in DSN ordering). */
-function d10Labels(fg: string, hunger: boolean): string[] {
-  const labels: string[] = [];
-  for (let n = 1; n <= 10; n++) {
-    if (n === 10) labels.push(face("10", fg, "mark"));
-    else if (n === 1 && hunger) labels.push(face("1", fg, "drop"));
-    else labels.push(face(String(n), fg));
-  }
-  // DSN d10 wants a leading placeholder for the unused index 0.
-  return ["", ...labels];
+/** Bump maps mirror the labels so the glyphs read as raised relief. */
+function bumpMaps(hunger: boolean): (string | undefined)[] {
+  return labels(hunger).map((l) => (l.endsWith(".png") ? l : undefined));
+}
+
+/** Emission only on the faces that matter: 10 regular; 1 and 10 Hunger. */
+function emissiveMaps(hunger: boolean): (string | undefined)[] {
+  const out: (string | undefined)[] = new Array(10).fill(undefined);
+  out[9] = ICON(hunger ? "messy" : "crit-gold");
+  if (hunger) out[0] = ICON("bestial");
+  return out;
 }
 
 export function registerDiceSoNice(): void {
@@ -48,41 +59,59 @@ export function registerDiceSoNice(): void {
         name: "gl-vampire",
         description: "GLUniverse — Kindred",
         category: "GLUniverse",
-        foreground: BONE,
-        background: INK,
-        outline: "#000000",
-        edge: BLOOD,
-        texture: "marble",
-        material: "glass",
+        foreground: "#d4af37",
+        background: "#0b0b0d",
+        outline: "none",
+        edge: "#1a1a1e",
+        // Untextured resin; the material must stay opaque — DSN's "glass"
+        // material transmits light, so white faces read see-through.
+        texture: "none",
+        material: "resin",
         font: "Oswald",
+        emissive: "#d4af37",
+        emissiveIntensity: 0.14,
       });
 
       dice3d.addColorset({
         name: "gl-hunger",
         description: "GLUniverse — Hunger",
         category: "GLUniverse",
-        foreground: BLOOD_LIGHT,
+        foreground: "#ffffff",
         background: BLOOD,
         outline: "#3a0608",
         edge: "#e0b7b7",
         texture: "marble",
         material: "metal",
         font: "Oswald",
+        emissive: "#ff2222",
+        emissiveIntensity: 0.15,
       });
 
-      dice3d.addDicePreset({
-        type: "d10",
-        labels: d10Labels(BONE, false),
-        system: SYSTEM_ID,
-        colorset: "gl-vampire",
-      });
+      dice3d.addDicePreset(
+        {
+          type: "dv",
+          labels: labels(false),
+          bumpMaps: bumpMaps(false),
+          emissiveMaps: emissiveMaps(false),
+          emissive: "#d4af37",
+          system: SYSTEM_ID,
+          colorset: "gl-vampire",
+        },
+        "d10",
+      );
 
-      dice3d.addDicePreset({
-        type: "d10",
-        labels: d10Labels(BLOOD_LIGHT, true),
-        system: SYSTEM_ID,
-        colorset: "gl-hunger",
-      });
+      dice3d.addDicePreset(
+        {
+          type: "dh",
+          labels: labels(true),
+          bumpMaps: bumpMaps(true),
+          emissiveMaps: emissiveMaps(true),
+          emissive: "#ff2222",
+          system: SYSTEM_ID,
+          colorset: "gl-hunger",
+        },
+        "d10",
+      );
     } catch (err) {
       console.warn(`${SYSTEM_ID} | Dice So Nice registration failed`, err);
     }

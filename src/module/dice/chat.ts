@@ -26,21 +26,44 @@ function esc(s: string): string {
   return foundry.utils.escapeHTML?.(s) ?? String(s);
 }
 
-/** One die chip: hunger vs regular, with success / crit / bestial styling. */
-function dieChip(value: number, hunger: boolean, rerolled = false): string {
+/**
+ * One die chip: hunger vs regular, glyph faces for successes/crits/banes.
+ * Glyphs are CSS-masked `<i>` elements (Foundry sanitizes chat HTML and strips
+ * inline `<svg>`); the mask images are the same SVG files the Dice So Nice
+ * presets use, coloured by the chip's `currentColor`.
+ */
+function dieChip(value: number, hunger: boolean, rerolled = false, index?: number): string {
   const cls = ["gl-die"];
   if (hunger) cls.push("hunger");
-  if (value === 10) cls.push("crit");
-  else if (value >= 6) cls.push("hit");
-  else if (hunger && value === 1) cls.push("bane");
-  else cls.push("miss");
+  let face: string | null = null;
+  if (value === 10) {
+    cls.push("crit");
+    face = hunger ? "gl-face-messy" : "gl-face-crit";
+  } else if (value >= 6) {
+    cls.push("hit");
+    face = "gl-face-mark";
+  } else if (hunger && value === 1) {
+    cls.push("bane");
+    face = "gl-face-bestial";
+  } else {
+    cls.push("miss");
+  }
   if (rerolled) cls.push("rerolled");
-  const title = rerolled ? ' title="Willpower re-roll"' : "";
-  return `<span class="${cls.join(" ")}"${title}>${value}</span>`;
+  const title = `${hunger ? "Hunger die" : "Die"}: ${value}${rerolled ? " — Willpower re-roll" : ""}`;
+  // Failure faces are blank like the real dice; the value stays as the corner
+  // numeral and the tooltip.
+  const body = `${face ? `<i class="gl-face ${face}"></i>` : ""}<em>${value}</em>`;
+  // Regular dice carry their pool index so the Willpower re-roll can offer
+  // click-to-select; Hunger dice may never be re-rolled (V5 core).
+  const data =
+    index !== undefined && !hunger ? ` data-die-index="${index}"` : "";
+  return `<span class="${cls.join(" ")}" title="${title}"${data}>${body}</span>`;
 }
 
 function diceRow(result: V5RollResult): string {
-  const chips = result.dice.map((d) => dieChip(d.value, d.hunger, d.rerolled)).join("");
+  const chips = result.dice
+    .map((d, i) => dieChip(d.value, d.hunger, d.rerolled, i))
+    .join("");
   return `<div class="gl-dice">${chips}</div>`;
 }
 
@@ -60,14 +83,25 @@ export interface RollCardOptions {
 /** Build the roll-card body (the message content Foundry wraps in its chrome). */
 export function rollCardHTML(opts: RollCardOptions): string {
   const { result } = opts;
+  // Difficulty 0 = open-ended roll: no Success/Failure verdict, just the tally.
+  // Crits (and Messy) still show; a rolled Hunger 1 flags a potential Bestial
+  // Failure since the Storyteller may yet rule the total a failure.
+  const openEnded = result.difficulty <= 0;
+  const potentialBestial = openEnded && result.won && result.hungerOnes > 0;
+  const showBadge =
+    !openEnded || !["success", "failure"].includes(result.outcome);
   const badge = OUTCOME_LABEL[result.outcome] ?? "Result";
+  const vsLine = openEnded
+    ? ""
+    : `<span class="gl-vs">vs Difficulty ${result.difficulty}</span>`;
   const critNote =
     result.critPairs > 0
       ? `<span class="gl-crit-note">+${result.bonusSuccesses} from ${result.critPairs} critical pair${result.critPairs > 1 ? "s" : ""}</span>`
       : "";
   const canReroll =
     !result.willpowerUsed && result.dice.some((d) => !d.hunger && !d.rerolled);
-  const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? "" : "s"}`;
+  const plural = (n: number, w: string) =>
+    `${n} ${n === 1 ? w : w === "success" ? "successes" : `${w}s`}`;
 
   const portrait = opts.img
     ? `<img class="gl-card-portrait" src="${esc(opts.img)}" alt="" onerror="this.style.display='none'"/>`
@@ -85,11 +119,13 @@ export function rollCardHTML(opts: RollCardOptions): string {
     </div>
 
     <div class="gl-card-tally gl-out-${result.outcome}">
-      <div class="gl-tally-num"><b>${result.successes}</b><span>${plural(result.successes, "success")}</span></div>
-      <div class="gl-tally-badge"><span class="gl-badge">${badge}</span><span class="gl-vs">vs Difficulty ${result.difficulty}</span></div>
+      <div class="gl-tally-num"><b>${result.successes}</b><span>${result.successes === 1 ? "success" : "successes"}</span></div>
+      <div class="gl-tally-badge">${showBadge ? `<span class="gl-badge">${badge}</span>` : ""}${vsLine}</div>
     </div>
 
     ${opts.bloodSurge ? `<div class="gl-surge-tag">Blood Surge — Rouse the Blood</div>` : ""}
+
+    ${potentialBestial ? `<div class="gl-bestial-warn">⚠ Potential Bestial Failure</div>` : ""}
 
     ${diceRow(result)}
 

@@ -1,15 +1,17 @@
 <script lang="ts">
   /* Compact Storyteller dice-pool roller. Lives pinned to the bottom-right of
-     the viewport (offset for the sidebar by its host), collapsible to a tab. */
+     the viewport (offset for the sidebar by its host). Idles as a small round
+     button; clicking it expands the full roll UI. */
   interface Props {
     onroll: (o: { pool: number; hunger: number; difficulty: number }) => void;
   }
   let { onroll }: Props = $props();
 
-  let open = $state(true);
+  let open = $state(false);
   let pool = $state(4);
   let hunger = $state(0);
-  let difficulty = $state(2);
+  // 0 = no difficulty: the card just reports successes.
+  let difficulty = $state(0);
 
   const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n));
   const bump = (which: "pool" | "hunger" | "difficulty", d: number) => {
@@ -20,13 +22,18 @@
   const go = () => onroll({ pool, hunger, difficulty });
 </script>
 
-<div class="hud" class:open>
-  <button class="tab" onclick={() => (open = !open)} title={open ? "Collapse" : "Storyteller pool"}>
-    <span class="tab-i">⚄</span>
-    {#if open}<span class="tab-t">Storyteller Pool</span>{/if}
+{#if !open}
+  <button class="orb" onclick={() => (open = true)} title="Storyteller pool" aria-label="Storyteller pool">
+    <span class="orb-i">⚄</span>
   </button>
+{:else}
+  <div class="hud open">
+    <button class="tab" onclick={() => (open = false)} title="Collapse">
+      <span class="tab-i">⚄</span>
+      <span class="tab-t">Storyteller Pool</span>
+      <span class="tab-x">✕</span>
+    </button>
 
-  {#if open}
     <div class="body">
       <div class="knobs">
         <div class="knob">
@@ -56,10 +63,35 @@
       </div>
       <button class="roll" onclick={go} disabled={pool === 0}>Roll {pool}d</button>
     </div>
-  {/if}
-</div>
+  </div>
+{/if}
 
 <style>
+  .orb {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--gl-blood);
+    color: var(--gl-parch);
+    border: 1px solid color-mix(in srgb, var(--gl-parch) 25%, var(--gl-blood));
+    box-shadow: 0 4px 14px -4px color-mix(in srgb, var(--gl-stage) 70%, transparent);
+    cursor: pointer;
+    padding: 0;
+    transition:
+      transform 0.12s ease,
+      background 0.12s ease;
+  }
+  .orb:hover {
+    background: var(--gl-blood-bright);
+    transform: scale(1.08);
+  }
+  .orb-i {
+    font-size: 20px;
+    line-height: 1;
+  }
   .hud {
     font-family: var(--gl-body);
     color: var(--gl-ink);
@@ -88,6 +120,17 @@
   }
   .tab-i {
     font-size: 13px;
+  }
+  .tab-t {
+    flex: 1;
+    text-align: left;
+  }
+  .tab-x {
+    font-size: 10px;
+    opacity: 0.7;
+  }
+  .tab:hover .tab-x {
+    opacity: 1;
   }
   .body {
     padding: 8px 10px 10px;

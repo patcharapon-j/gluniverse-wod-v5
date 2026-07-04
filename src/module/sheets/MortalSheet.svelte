@@ -8,7 +8,7 @@
   import EffectsPanel from "../components/EffectsPanel.svelte";
   import Portrait from "../components/Portrait.svelte";
   import { createItem, editItem, deleteItem } from "../apps/actor-items.ts";
-  import { openRollDialog } from "../apps/RollDialogApp.ts";
+  import { openRollDialog, rollWeapon } from "../apps/RollDialogApp.ts";
   import { pickImage } from "../apps/image.ts";
 
   /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -29,6 +29,12 @@
 
   let dragOver = $state(false);
   let editMode = $state(false);
+  let expanded: Record<string, boolean> = $state({});
+  const reveal = (key: string) => (expanded[key] = !expanded[key]);
+
+  // Marquee copy for the edit-mode frame; two identical spans scroll -50% for a
+  // seamless loop.
+  const EDIT_TICKER = "EDIT MODE · ".repeat(24);
 
   function up(path: string, value: unknown) {
     doc.update({ [path]: value });
@@ -51,12 +57,18 @@
 <div
   class="gl-mortal"
   class:dragover={dragOver}
+  class:editing={editMode}
   role="region"
   aria-label="{prettify(doc.type)} sheet"
   ondragover={(e) => (e.preventDefault(), (dragOver = true))}
   ondragleave={() => (dragOver = false)}
   ondrop={onDrop}
 >
+  {#if editMode}
+    <div class="edit-marquee top" aria-hidden="true">
+      <div class="edit-marquee-track"><span>{EDIT_TICKER}</span><span>{EDIT_TICKER}</span></div>
+    </div>
+  {/if}
   <header class="hdr">
     <div class="spine"></div>
     <Portrait img={snap.img} name={snap.name} editable={editMode} onedit={() => pickImage(doc)} />
@@ -211,9 +223,32 @@
       {#if equipment.length === 0}<p class="empty">Weapons, armor &amp; gear.</p>{/if}
       {#each equipment as g (g.id)}
         <div class="line gl-row" data-item-id={g.id}>
-          <span class="line-name"><b>{g.name}</b> <i>· {prettify(g.type)}</i></span>
+          <button class="line-name reveal" onclick={() => reveal(g.id)} title="Show detail"><b>{g.name}</b> <i>· {prettify(g.type)}</i></button>
+          {#if g.type === "weapon"}
+            <button class="mini-roll" onclick={() => rollWeapon(doc, g)} title="Roll {g.name}" aria-label="Roll">⚄</button>
+          {/if}
           {#if editMode}<ItemControls onedit={() => editItem(doc, g.id)} ondelete={() => deleteItem(doc, g.id)} />{/if}
         </div>
+        {#if expanded[g.id]}
+          <div class="detail">
+            <div class="detail-facts">
+              {#if g.type === "weapon"}
+                <span><b>Damage</b> {g.system.damage} {g.system.damageType}</span>
+                {#if g.system.pool}<span><b>Pool</b> {g.system.pool}</span>{/if}
+                {#if g.system.range}<span><b>Range</b> {g.system.range}</span>{/if}
+                {#if g.system.concealment}<span><b>Conceal</b> {g.system.concealment}</span>{/if}
+              {:else if g.type === "armor"}
+                <span><b>Rating</b> {g.system.rating}</span>
+                {#if g.system.type}<span><b>Type</b> {g.system.type}</span>{/if}
+                {#if g.system.penalty}<span><b>Penalty</b> {g.system.penalty}</span>{/if}
+              {:else}
+                <span><b>Qty</b> {g.system.quantity}</span>
+                {#if g.system.cost}<span><b>Cost</b> {g.system.cost}</span>{/if}
+              {/if}
+            </div>
+            {#if g.system.description}<div class="detail-body">{@html g.system.description}</div>{/if}
+          </div>
+        {/if}
       {/each}
     </section>
   </div>
@@ -226,6 +261,12 @@
   <div class="foot">
     <EffectsPanel {doc} {snap} />
   </div>
+
+  {#if editMode}
+    <div class="edit-marquee bottom" aria-hidden="true">
+      <div class="edit-marquee-track"><span>{EDIT_TICKER}</span><span>{EDIT_TICKER}</span></div>
+    </div>
+  {/if}
 </div>
 
 <style>
@@ -237,6 +278,62 @@
     color: var(--gl-ink);
     font-family: var(--gl-body);
     position: relative;
+  }
+  /* edit mode — unmistakably different from play mode */
+  .gl-mortal.editing {
+    box-shadow: inset 0 0 0 3px var(--gl-gold);
+  }
+  .gl-mortal.editing .spine {
+    background: repeating-linear-gradient(
+      -45deg,
+      var(--gl-gold) 0 12px,
+      var(--gl-ink) 12px 24px
+    );
+  }
+  .edit-marquee {
+    position: sticky;
+    z-index: 15;
+    overflow: hidden;
+    white-space: nowrap;
+    font-family: var(--gl-cond);
+    text-transform: uppercase;
+    letter-spacing: 5px;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 5px 0;
+    color: var(--gl-ink);
+    background: var(--gl-gold);
+  }
+  .edit-marquee.top {
+    top: 0;
+    border-bottom: 1px solid var(--gl-ink);
+  }
+  .edit-marquee.bottom {
+    bottom: 0;
+    border-top: 1px solid var(--gl-ink);
+  }
+  .edit-marquee-track {
+    display: inline-flex;
+    animation: gl-edit-ticker 90s linear infinite;
+    will-change: transform;
+  }
+  .edit-marquee.bottom .edit-marquee-track {
+    animation-direction: reverse;
+  }
+  .edit-marquee-track span {
+    flex: none;
+  }
+  @keyframes gl-edit-ticker {
+    from {
+      transform: translateX(0);
+    }
+    to {
+      transform: translateX(-50%);
+    }
+  }
+  .gl-mortal.editing input:not(:disabled) {
+    border-bottom-color: var(--gl-line);
+    background: color-mix(in srgb, var(--gl-gold) 9%, transparent);
   }
   .gl-mortal.dragover::after {
     content: "Drop to add";
@@ -307,12 +404,19 @@
     cursor: pointer;
   }
   .mode-toggle.on {
-    color: var(--gl-blood);
-    border-color: var(--gl-blood);
+    color: var(--gl-ink);
+    background: var(--gl-gold);
+    border-color: var(--gl-ink);
+    font-weight: 600;
   }
   .mode-toggle:hover {
     border-color: var(--gl-blood);
     color: var(--gl-blood);
+  }
+  .mode-toggle.on:hover {
+    color: var(--gl-ink);
+    border-color: var(--gl-ink);
+    background: color-mix(in srgb, var(--gl-gold) 82%, white);
   }
   .spine {
     position: absolute;
@@ -553,6 +657,62 @@
   }
   .line-name.flaw b {
     color: var(--gl-blood);
+  }
+  .reveal {
+    background: transparent;
+    border: none;
+    padding: 0;
+    text-align: left;
+    cursor: pointer;
+    color: inherit;
+    font: inherit;
+  }
+  .reveal:hover b {
+    color: var(--gl-blood);
+  }
+  .mini-roll {
+    background: transparent;
+    border: none;
+    color: var(--gl-blood);
+    cursor: pointer;
+    font-size: 14px;
+    padding: 0 2px;
+    line-height: 1;
+    flex: none;
+  }
+  .mini-roll:hover {
+    color: var(--gl-blood-bright);
+  }
+  .detail {
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--gl-muted-2);
+    background: var(--gl-parch-raise);
+    border-left: 2px solid var(--gl-blood);
+    padding: 8px 12px;
+    margin: 2px 0 8px;
+  }
+  .detail :global(p) {
+    margin: 0 0 6px;
+  }
+  .detail :global(p:last-child) {
+    margin-bottom: 0;
+  }
+  .detail-facts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 14px;
+    font-family: var(--gl-cond);
+    font-size: 11px;
+    letter-spacing: 0.5px;
+    margin-bottom: 6px;
+  }
+  .detail-facts b {
+    color: var(--gl-blood);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-size: 9px;
+    margin-right: 3px;
   }
   .empty {
     font-size: 12px;

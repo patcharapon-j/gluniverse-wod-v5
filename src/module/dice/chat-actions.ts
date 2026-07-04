@@ -11,18 +11,102 @@ import type { V5RollResult } from "./roll-v5.ts";
 import { willpowerReroll } from "./roll-v5.ts";
 import { rollCardHTML, renderDiceTooltip } from "./chat.ts";
 
+const MAX_WP_REROLL = 3;
+
 /**
- * Spend a Willpower re-roll on an existing card: re-roll the lowest regular dice,
- * mark one Superficial Willpower on the actor, and rewrite the *same* message so
- * there is no duplicate card and no second re-roll is offered.
+ * Enter selection mode on the card: the player clicks up to three regular dice
+ * to re-roll (V5 core — Hunger dice are never eligible), then confirms. The
+ * card's action row is swapped for confirm/cancel; cancel restores it. All of
+ * this is local DOM state — nothing touches the message until confirm.
  */
-async function onWillpowerReroll(message: any, button: HTMLElement): Promise<void> {
-  const flags = message.getFlag?.(SYSTEM_ID) ?? {};
+function onWillpowerReroll(message: any, button: HTMLElement): void {
+  // Whole-scope read: getFlag(scope, key) needs a key, so go via `flags` directly.
+  const flags = message.flags?.[SYSTEM_ID] ?? {};
   const prev = flags.result as V5RollResult | undefined;
   if (!prev || prev.willpowerUsed) return;
-  button.setAttribute("disabled", "true");
 
-  const redo = await willpowerReroll(prev);
+  const card = button.closest<HTMLElement>(".gl-card");
+  const actions = card?.querySelector<HTMLElement>(".gl-card-actions");
+  if (!card || !actions) return;
+
+  card.classList.add("gl-selecting");
+  const originalActions = actions.innerHTML;
+  const selected = new Set<number>();
+
+  actions.innerHTML = `
+    <button type="button" class="gl-act gl-act-confirm" disabled>Re-roll (0/${MAX_WP_REROLL})</button>
+    <button type="button" class="gl-act gl-act-cancel">Cancel</button>`;
+  const confirmBtn = actions.querySelector<HTMLButtonElement>(".gl-act-confirm")!;
+  const cancelBtn = actions.querySelector<HTMLButtonElement>(".gl-act-cancel")!;
+
+  const chips = [...card.querySelectorAll<HTMLElement>(".gl-die[data-die-index]")];
+
+  const refresh = () => {
+    confirmBtn.textContent = `Re-roll (${selected.size}/${MAX_WP_REROLL})`;
+    confirmBtn.disabled = selected.size === 0;
+  };
+
+  const exit = () => {
+    card.classList.remove("gl-selecting");
+    chips.forEach((c) => {
+      c.classList.remove("gl-selected");
+      c.removeEventListener("click", onChip);
+    });
+    actions.innerHTML = originalActions;
+    // The captured HTML carries the bound marker from before; clear it so the
+    // restored Willpower button gets a fresh listener.
+    actions
+      .querySelectorAll<HTMLElement>("[data-gl-action]")
+      .forEach((b) => delete b.dataset.glBound);
+    bind(message, card);
+  };
+
+  function onChip(this: HTMLElement): void {
+    const idx = Number(this.dataset.dieIndex);
+    if (selected.has(idx)) {
+      selected.delete(idx);
+      this.classList.remove("gl-selected");
+    } else {
+      if (selected.size >= MAX_WP_REROLL) return;
+      selected.add(idx);
+      this.classList.add("gl-selected");
+    }
+    refresh();
+  }
+
+  chips.forEach((c) => c.addEventListener("click", onChip));
+  cancelBtn.addEventListener("click", (ev) => {
+    ev.preventDefault();
+    exit();
+  });
+  confirmBtn.addEventListener("click", async (ev) => {
+    ev.preventDefault();
+    if (selected.size === 0) return;
+    confirmBtn.disabled = true;
+    cancelBtn.disabled = true;
+    confirmBtn.textContent = "Rolling…";
+    try {
+      await performWillpowerReroll(message, flags, prev, [...selected]);
+    } catch (err) {
+      console.error(`${SYSTEM_ID} | Willpower re-roll failed`, err);
+      exit();
+    }
+  });
+}
+
+/**
+ * Execute a confirmed Willpower re-roll: re-roll the chosen dice, mark one
+ * Superficial Willpower on the actor, wait for the Dice So Nice animation to
+ * finish, then rewrite the *same* message so there is no duplicate card and no
+ * second re-roll is offered.
+ */
+async function performWillpowerReroll(
+  message: any,
+  flags: any,
+  prev: V5RollResult,
+  indices: number[],
+): Promise<void> {
+  const redo = await willpowerReroll(prev, indices);
   if (!redo) return;
 
   const actorUuid = flags.actorUuid as string | undefined;
@@ -33,6 +117,18 @@ async function onWillpowerReroll(message: any, button: HTMLElement): Promise<voi
     .map((d, i) => (d.rerolled ? i + 1 : 0))
     .filter(Boolean);
   const note = `Willpower re-roll — 1 Superficial Willpower spent; re-rolled ${rerolled.length} ${rerolled.length === 1 ? "die" : "dice"}.`;
+
+  // Roll the 3D dice and hold the card update until the animation finishes.
+  // DSN only auto-animates on message *creation*, so the re-roll must be shown
+  // explicitly — and awaiting it keeps the result hidden until the dice land.
+  const dice3d = (game as any).dice3d;
+  if (dice3d) {
+    try {
+      await dice3d.showForRoll(redo.roll, (game as any).user, true);
+    } catch (err) {
+      console.warn(`${SYSTEM_ID} | Dice So Nice animation failed`, err);
+    }
+  }
 
   const diceTooltip = await renderDiceTooltip(redo.roll);
   const content = rollCardHTML({
@@ -46,11 +142,14 @@ async function onWillpowerReroll(message: any, button: HTMLElement): Promise<voi
   });
 
   // Edit the original message in place; append the re-roll's dice to its rolls.
+  // The `dice-so-nice.skip` flag stops DSN from animating the appended roll a
+  // second time (its updateChatMessage hook) — we already showed it above.
   const rolls = [...(message.rolls ?? []), redo.roll];
   await message.update({
     content,
     rolls,
     [`flags.${SYSTEM_ID}.result`]: redo.result,
+    "flags.dice-so-nice.skip": true,
   });
 }
 
@@ -65,12 +164,15 @@ async function markWillpowerCost(actor: any): Promise<void> {
   await actor.update({ "system.willpower.superficial": superficial + 1 });
 }
 
-async function onAction(message: any, button: HTMLElement): Promise<void> {
-  if (button.dataset.glAction === "wp-reroll") await onWillpowerReroll(message, button);
+function onAction(message: any, button: HTMLElement): void {
+  if (button.dataset.glAction === "wp-reroll") onWillpowerReroll(message, button);
 }
 
 function bind(message: any, root: HTMLElement): void {
   root.querySelectorAll<HTMLElement>("[data-gl-action]").forEach((btn) => {
+    // Both render hooks can fire for one message on v13; bind each button once.
+    if (btn.dataset.glBound) return;
+    btn.dataset.glBound = "1";
     btn.addEventListener("click", (ev) => {
       ev.preventDefault();
       onAction(message, btn);

@@ -60,15 +60,57 @@
 /* ------------------------------------------------------------------ *
  * Chat cards. Rendered as HTML strings into Foundry's chat log, so the
  * styling lives here (global) rather than inside a Svelte component.
+ * The chat message itself becomes the parchment card: Foundry's own
+ * message chrome is restyled via :has(), and .gl-card stays flat so the
+ * result reads as one card instead of a card nested in a card.
  * ------------------------------------------------------------------ */
-.gl-card {
-  font-family: var(--gl-body);
-  color: var(--gl-ink);
+.chat-message:has(.gl-card) {
   background: var(--gl-parch);
   border: 1px solid var(--gl-line);
   border-left: 4px solid var(--gl-blood);
-  padding: 10px 12px;
-  margin: -3px 0;
+  border-radius: 0;
+  padding: 0;
+  color: var(--gl-ink);
+}
+.chat-message:has(.gl-card) .message-header {
+  padding: 5px 12px 0;
+  color: var(--gl-muted-2);
+}
+.chat-message:has(.gl-card) .message-sender {
+  font-family: var(--gl-cond);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  font-size: 11px;
+}
+.chat-message:has(.gl-card) .message-content {
+  margin: 0;
+}
+/* Outcome-tinted left edge: the card's verdict reads at a glance in the log. */
+.chat-message:has(.gl-card[data-outcome="success"]) {
+  border-left-color: var(--gl-good);
+}
+.chat-message:has(.gl-card[data-outcome="critical"]) {
+  border-left-color: var(--gl-gold);
+}
+.chat-message:has(.gl-card[data-outcome="messy"]),
+.chat-message:has(.gl-card[data-outcome="bestial"]) {
+  border-left-color: var(--gl-blood-bright);
+}
+.chat-message:has(.gl-card[data-outcome="failure"]),
+.chat-message:has(.gl-card[data-outcome="totalFailure"]) {
+  border-left-color: var(--gl-line-dark);
+}
+.chat-message:has(.gl-card.gl-surge) {
+  border-left-color: var(--gl-blood-bright);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--gl-blood) 30%, transparent);
+}
+.gl-card {
+  font-family: var(--gl-body);
+  color: var(--gl-ink);
+  background: transparent;
+  border: none;
+  padding: 6px 12px 10px;
+  margin: 0;
   position: relative;
   overflow: hidden;
 }
@@ -81,13 +123,14 @@
   margin-bottom: 8px;
 }
 .gl-card-portrait {
-  width: 44px;
-  height: 44px;
+  width: 46px;
+  height: 46px;
   object-fit: cover;
-  border: 1px solid var(--gl-line);
+  border: 1px solid var(--gl-line-soft);
   border-radius: 3px;
   flex: none;
   background: var(--gl-parch-raise);
+  box-shadow: 0 1px 3px color-mix(in srgb, var(--gl-ink) 18%, transparent);
 }
 .gl-card-id {
   display: flex;
@@ -115,6 +158,8 @@
   justify-content: space-between;
   gap: 10px;
   margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px dotted var(--gl-line-soft);
 }
 .gl-tally-num {
   display: flex;
@@ -179,15 +224,33 @@
 .gl-out-bestial .gl-badge {
   color: var(--gl-blood-bright);
 }
+/* Open-ended rolls (no difficulty): a rolled Hunger 1 may still turn the
+   result bestial if the Storyteller rules the total a failure. */
+.gl-bestial-warn {
+  font-family: var(--gl-cond);
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--gl-parch);
+  background: var(--gl-blood-bright);
+  display: block;
+  text-align: center;
+  padding: 5px 10px;
+  border-radius: 2px;
+  margin-bottom: 8px;
+  animation: gl-surge-pulse 1.4s ease-in-out 3;
+}
 .gl-dice {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
+  gap: 5px;
   margin-bottom: 8px;
 }
 .gl-die {
-  width: 26px;
-  height: 26px;
+  position: relative;
+  width: 34px;
+  height: 34px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -195,18 +258,62 @@
   font-weight: 600;
   font-size: 13px;
   border: 1.5px solid var(--gl-line);
+  border-radius: 4px;
   background: var(--gl-parch-raise);
-  color: var(--gl-muted-2);
+  color: var(--gl-muted);
   box-sizing: border-box;
+  box-shadow: inset 0 -2px 0 color-mix(in srgb, var(--gl-ink) 6%, transparent);
+}
+/* Glyph face: success mark / starred crit / fanged messy / fanged skull.
+ * CSS-masked so the chip's currentColor paints the same SVG files the Dice So
+ * Nice presets use. */
+.gl-die .gl-face {
+  width: 26px;
+  height: 26px;
+  display: block;
+  background-color: currentColor;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+}
+.gl-die .gl-face-mark {
+  -webkit-mask-image: url("../assets/dice/mark.svg");
+  mask-image: url("../assets/dice/mark.svg");
+}
+.gl-die .gl-face-crit {
+  -webkit-mask-image: url("../assets/dice/crit.svg");
+  mask-image: url("../assets/dice/crit.svg");
+}
+.gl-die .gl-face-messy {
+  -webkit-mask-image: url("../assets/dice/messy.svg");
+  mask-image: url("../assets/dice/messy.svg");
+}
+.gl-die .gl-face-bestial {
+  -webkit-mask-image: url("../assets/dice/bestial.svg");
+  mask-image: url("../assets/dice/bestial.svg");
+}
+/* The raw value tucked into the corner so the glyph stays legible. */
+.gl-die em {
+  position: absolute;
+  right: 2px;
+  bottom: 1px;
+  font-style: normal;
+  font-size: 8px;
+  line-height: 1;
+  opacity: 0.75;
 }
 .gl-die.hit {
-  border-color: var(--gl-ink);
+  border-color: var(--gl-ink-soft);
   color: var(--gl-ink);
 }
 .gl-die.crit {
   border-color: var(--gl-gold);
-  background: var(--gl-gold);
+  background: linear-gradient(160deg, #caa22a, var(--gl-gold));
   color: var(--gl-stage);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--gl-gold) 45%, transparent);
 }
 .gl-die.hunger {
   border-color: var(--gl-blood);
@@ -214,9 +321,10 @@
   background: var(--gl-rouse-bg);
 }
 .gl-die.hunger.crit {
-  background: var(--gl-blood-bright);
+  background: linear-gradient(160deg, var(--gl-blood-bright), var(--gl-blood));
   color: var(--gl-parch);
   border-color: var(--gl-blood-bright);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--gl-blood-bright) 45%, transparent);
 }
 .gl-die.hunger.bane {
   background: var(--gl-blood);
@@ -226,6 +334,25 @@
 .gl-die.rerolled {
   outline: 2px dotted var(--gl-gold);
   outline-offset: 1px;
+}
+/* Willpower re-roll selection mode: regular dice become click targets (Hunger
+ * dice carry no data-die-index and stay inert, per V5). */
+.gl-selecting .gl-die[data-die-index] {
+  cursor: pointer;
+  transition: transform 100ms ease, box-shadow 100ms ease, border-color 100ms ease;
+}
+.gl-selecting .gl-die[data-die-index]:hover {
+  border-color: var(--gl-blood);
+  transform: translateY(-1px);
+}
+.gl-selecting .gl-die:not([data-die-index]) {
+  opacity: 0.45;
+}
+.gl-die.gl-selected,
+.gl-selecting .gl-die.gl-selected:hover {
+  border-color: var(--gl-blood);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--gl-blood) 55%, transparent);
+  transform: translateY(-1px);
 }
 .gl-card-meta {
   display: flex;
@@ -256,18 +383,21 @@
 .gl-act {
   font-family: var(--gl-cond);
   text-transform: uppercase;
-  letter-spacing: 1px;
+  letter-spacing: 2px;
   font-size: 10px;
+  font-weight: 600;
   color: var(--gl-blood);
   background: transparent;
-  border: 1px solid var(--gl-line);
+  border: 1px solid color-mix(in srgb, var(--gl-blood) 45%, var(--gl-line));
   border-radius: 3px;
-  padding: 3px 10px;
+  padding: 5px 14px;
   cursor: pointer;
+  transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
 }
 .gl-act:hover {
   border-color: var(--gl-blood);
-  background: color-mix(in srgb, var(--gl-blood) 8%, transparent);
+  background: var(--gl-blood);
+  color: var(--gl-parch);
 }
 .gl-act[disabled] {
   opacity: 0.5;
@@ -294,11 +424,8 @@
 .gl-card-breakdown[open] > summary::before { content: "▾ "; }
 .gl-card-breakdown .dice-roll { margin-top: 6px; }
 
-/* Blood Surge — a red band sweeps the card and a tag names the cost. */
-.gl-card.gl-surge {
-  border-left-color: var(--gl-blood-bright);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--gl-blood) 30%, transparent);
-}
+/* Blood Surge — a red band sweeps the card and a tag names the cost.
+ * The red edge + inset ring live on the .chat-message rule above. */
 .gl-surge-band {
   position: absolute;
   top: 0;

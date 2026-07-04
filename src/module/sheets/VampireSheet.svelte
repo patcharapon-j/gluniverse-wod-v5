@@ -8,9 +8,9 @@
   import ItemControls from "../components/ItemControls.svelte";
   import EffectsPanel from "../components/EffectsPanel.svelte";
   import Portrait from "../components/Portrait.svelte";
-  import CreationHelper from "../components/CreationHelper.svelte";
   import { createItem, editItem, deleteItem } from "../apps/actor-items.ts";
-  import { openRollDialog, rollPower, rollDiscipline } from "../apps/RollDialogApp.ts";
+  import { openBuilder } from "../apps/BuilderApp.ts";
+  import { openRollDialog, rollPower, rollDiscipline, rollWeapon } from "../apps/RollDialogApp.ts";
   import { openXpDialog } from "../apps/XpDialogApp.ts";
   import { pickImage } from "../apps/image.ts";
   import { rouseCheck, remorseCheck } from "../dice/checks.ts";
@@ -56,7 +56,6 @@
   let collapsed: Record<string, boolean> = $state({});
   let expanded: Record<string, boolean> = $state({});
   let editMode = $state(false);
-  let showBuilder = $state(false);
   let dragOver = $state(false);
 
   const toggle = (key: string) => (collapsed[key] = !collapsed[key]);
@@ -99,6 +98,10 @@
     app.glHandleDrop?.(event);
   }
 
+  // Marquee copy for the edit-mode frame; two identical spans scroll -50% for a
+  // seamless loop.
+  const EDIT_TICKER = "EDIT MODE · ".repeat(24);
+
   // --- rolls ----------------------------------------------------------------
   const rollAttr = (k: string) => openRollDialog(doc, { attribute: k });
   const rollSkill = (k: string) => openRollDialog(doc, { skill: k });
@@ -109,12 +112,18 @@
   class="gl-vampire"
   class:dragover={dragOver}
   class:play={!editMode}
+  class:editing={editMode}
   role="region"
   aria-label="Vampire character sheet"
   ondragover={(e) => (e.preventDefault(), (dragOver = true))}
   ondragleave={() => (dragOver = false)}
   ondrop={onDrop}
 >
+  {#if editMode}
+    <div class="edit-marquee top" aria-hidden="true">
+      <div class="edit-marquee-track"><span>{EDIT_TICKER}</span><span>{EDIT_TICKER}</span></div>
+    </div>
+  {/if}
   <!-- header -->
   <header class="hdr">
     <div class="spine"></div>
@@ -134,7 +143,7 @@
           <button class="mode-toggle" class:on={editMode} onclick={() => (editMode = !editMode)} title="Toggle play / edit">
             {editMode ? "🔓 Edit" : "🔒 Play"}
           </button>
-          <button class="tool-btn" class:on={showBuilder} onclick={() => (showBuilder = !showBuilder)} title="Character creation helper">Builder</button>
+          <button class="tool-btn" onclick={() => openBuilder(doc)} title="Step-by-step character builder">Builder</button>
           <button class="tool-btn" onclick={() => openXpDialog(doc)} title="Spend experience">Spend XP</button>
           <button class="roll-cta" onclick={openPool} title="Build a dice pool">Roll Pool</button>
         </div>
@@ -169,10 +178,6 @@
       </div>
     </div>
   </header>
-
-  {#if showBuilder}
-    <CreationHelper {doc} {snap} />
-  {/if}
 
   {#if sys.clan}
     <div class="banestrip">
@@ -402,25 +407,57 @@
       {#each weapons as w (w.id)}
         <div class="eq gl-row" data-item-id={w.id}>
           <button class="eq-check" class:on={w.system.equipped} aria-label="Toggle equipped" title="Equipped" onclick={() => upItem(w.id, "system.equipped", !w.system.equipped)}>✓</button>
-          <span class="eq-name"><b>{w.name}</b></span>
+          <button class="eq-name reveal" onclick={() => reveal(w.id)} title="Show detail"><b>{w.name}</b></button>
           <span class="eq-stat">{w.system.damage} {w.system.damageType === "aggravated" ? "agg" : "sup"}</span>
+          <button class="mini-roll" onclick={() => rollWeapon(doc, w)} title="Roll {w.name}" aria-label="Roll">⚄</button>
           {#if editMode}<ItemControls onedit={() => editItem(doc, w.id)} ondelete={() => deleteItem(doc, w.id)} />{/if}
         </div>
+        {#if expanded[w.id]}
+          <div class="detail">
+            <div class="detail-facts">
+              <span><b>Damage</b> {w.system.damage} {w.system.damageType}</span>
+              {#if w.system.pool}<span><b>Pool</b> {w.system.pool}</span>{/if}
+              {#if w.system.range}<span><b>Range</b> {w.system.range}</span>{/if}
+              {#if w.system.concealment}<span><b>Conceal</b> {w.system.concealment}</span>{/if}
+              {#if (w.system.quantity ?? 1) !== 1}<span><b>Qty</b> {w.system.quantity}</span>{/if}
+            </div>
+            {#if w.system.description}<div class="detail-body">{@html w.system.description}</div>{/if}
+          </div>
+        {/if}
       {/each}
       {#each armor as a (a.id)}
         <div class="eq gl-row" data-item-id={a.id}>
           <button class="eq-check" class:on={a.system.equipped} aria-label="Toggle equipped" title="Equipped" onclick={() => upItem(a.id, "system.equipped", !a.system.equipped)}>✓</button>
-          <span class="eq-name"><b>{a.name}</b></span>
+          <button class="eq-name reveal" onclick={() => reveal(a.id)} title="Show detail"><b>{a.name}</b></button>
           <span class="eq-stat">rating {a.system.rating}</span>
           {#if editMode}<ItemControls onedit={() => editItem(doc, a.id)} ondelete={() => deleteItem(doc, a.id)} />{/if}
         </div>
+        {#if expanded[a.id]}
+          <div class="detail">
+            <div class="detail-facts">
+              <span><b>Rating</b> {a.system.rating}</span>
+              {#if a.system.type}<span><b>Type</b> {a.system.type}</span>{/if}
+              {#if a.system.penalty}<span><b>Penalty</b> {a.system.penalty}</span>{/if}
+            </div>
+            {#if a.system.description}<div class="detail-body">{@html a.system.description}</div>{/if}
+          </div>
+        {/if}
       {/each}
       {#each gear as g (g.id)}
         <div class="eq gl-row" data-item-id={g.id}>
           <span class="eq-qty">×{g.system.quantity}</span>
-          <span class="eq-name"><b>{g.name}</b></span>
+          <button class="eq-name reveal" onclick={() => reveal(g.id)} title="Show detail"><b>{g.name}</b></button>
           {#if editMode}<ItemControls onedit={() => editItem(doc, g.id)} ondelete={() => deleteItem(doc, g.id)} />{/if}
         </div>
+        {#if expanded[g.id]}
+          <div class="detail">
+            <div class="detail-facts">
+              <span><b>Qty</b> {g.system.quantity}</span>
+              {#if g.system.cost}<span><b>Cost</b> {g.system.cost}</span>{/if}
+            </div>
+            {#if g.system.description}<div class="detail-body">{@html g.system.description}</div>{/if}
+          </div>
+        {/if}
       {/each}
     </section>
   </div>
@@ -465,6 +502,12 @@
   <div class="effects-wrap">
     <EffectsPanel {doc} {snap} />
   </div>
+
+  {#if editMode}
+    <div class="edit-marquee bottom" aria-hidden="true">
+      <div class="edit-marquee-track"><span>{EDIT_TICKER}</span><span>{EDIT_TICKER}</span></div>
+    </div>
+  {/if}
 </div>
 
 <style>
@@ -480,6 +523,63 @@
     color: var(--gl-ink);
     font-family: var(--gl-body);
     position: relative;
+  }
+  /* edit mode — unmistakably different from play mode */
+  .gl-vampire.editing {
+    box-shadow: inset 0 0 0 3px var(--gl-gold);
+  }
+  .gl-vampire.editing .spine {
+    background: repeating-linear-gradient(
+      -45deg,
+      var(--gl-gold) 0 12px,
+      var(--gl-ink) 12px 24px
+    );
+  }
+  .edit-marquee {
+    position: sticky;
+    z-index: 15;
+    overflow: hidden;
+    white-space: nowrap;
+    font-family: var(--gl-cond);
+    text-transform: uppercase;
+    letter-spacing: 5px;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 5px 0;
+    color: var(--gl-ink);
+    background: var(--gl-gold);
+  }
+  .edit-marquee.top {
+    top: 0;
+    border-bottom: 1px solid var(--gl-ink);
+  }
+  .edit-marquee.bottom {
+    bottom: 0;
+    border-top: 1px solid var(--gl-ink);
+  }
+  .edit-marquee-track {
+    display: inline-flex;
+    animation: gl-edit-ticker 90s linear infinite;
+    will-change: transform;
+  }
+  .edit-marquee.bottom .edit-marquee-track {
+    animation-direction: reverse;
+  }
+  .edit-marquee-track span {
+    flex: none;
+  }
+  @keyframes gl-edit-ticker {
+    from {
+      transform: translateX(0);
+    }
+    to {
+      transform: translateX(-50%);
+    }
+  }
+  .gl-vampire.editing input:not(:disabled),
+  .gl-vampire.editing select:not(:disabled) {
+    border-bottom-color: var(--gl-line);
+    background: color-mix(in srgb, var(--gl-gold) 9%, transparent);
   }
   .gl-vampire.dragover::after {
     content: "Drop to add";
@@ -588,15 +688,21 @@
     color: var(--gl-muted-2);
     cursor: pointer;
   }
-  .mode-toggle.on,
-  .tool-btn.on {
-    color: var(--gl-blood);
-    border-color: var(--gl-blood);
+  .mode-toggle.on {
+    color: var(--gl-ink);
+    background: var(--gl-gold);
+    border-color: var(--gl-ink);
+    font-weight: 600;
   }
   .tool-btn:hover,
   .mode-toggle:hover {
     border-color: var(--gl-blood);
     color: var(--gl-blood);
+  }
+  .mode-toggle.on:hover {
+    color: var(--gl-ink);
+    border-color: var(--gl-ink);
+    background: color-mix(in srgb, var(--gl-gold) 82%, white);
   }
   .facts {
     display: flex;
@@ -923,7 +1029,8 @@
   }
   .disc-name:hover,
   .pw-name:hover,
-  .adv-lbl:hover b {
+  .adv-lbl:hover b,
+  .eq-name:hover b {
     color: var(--gl-blood);
   }
   .mini-roll {

@@ -9,6 +9,7 @@ import { SYSTEM_ID } from "./config.ts";
 import { registerDataModels } from "./data/index.ts";
 import { registerSheets } from "./sheets/register.ts";
 import { registerChatActions } from "./dice/chat-actions.ts";
+import { registerDiceTerms } from "./dice/terms.ts";
 import { registerSettings } from "./settings.ts";
 import { registerConditions } from "./conditions.ts";
 import { openRollDialog } from "./apps/RollDialogApp.ts";
@@ -21,6 +22,7 @@ Hooks.once("init", () => {
   console.log(`${SYSTEM_ID} | Initializing GLUniverse — World of Darkness V5`);
   registerSettings();
   registerConditions();
+  registerDiceTerms();
   registerDataModels();
   registerSheets();
   registerChatActions();

@@ -39,18 +39,62 @@ export function initGmHud(): void {
 
   mount(GmHud, { target: host, props: { onroll: doRoll } });
 
-  const setOffset = (): void => {
-    const sb =
-      document.querySelector("#sidebar") ??
+  const findSidebar = (): HTMLElement | null =>
+    (document.querySelector("#sidebar") ??
       document.querySelector("#ui-right") ??
-      document.querySelector("aside#sidebar");
-    const w = sb ? (sb as HTMLElement).getBoundingClientRect().width : 300;
+      document.querySelector("aside#sidebar")) as HTMLElement | null;
+
+  // How much viewport the sidebar actually covers on the right. Width alone
+  // lies when the sidebar collapses via transform (it keeps its layout width),
+  // and the left edge alone lies when the element isn't right-docked yet — the
+  // smaller of the two is right in every state. Clamp so a bogus measurement
+  // can never push the HUD off-screen.
+  const setOffset = (): void => {
+    const sb = findSidebar();
+    let w = 300;
+    if (sb) {
+      const r = sb.getBoundingClientRect();
+      w = r.width > 0 ? Math.min(r.width, window.innerWidth - r.left) : 0;
+      w = Math.max(0, Math.min(w, 600));
+    }
     host.style.right = `${Math.round(w) + 14}px`;
   };
-  setOffset();
 
-  Hooks.on("collapseSidebar", () => window.setTimeout(setOffset, 60));
-  Hooks.on("renderSidebar", () => setOffset());
-  Hooks.on("renderSidebarTab", () => setOffset());
+  // The v13+ sidebar animates open/closed; a one-shot measurement lands
+  // mid-transition, so re-measure every frame until things settle.
+  let settleUntil = 0;
+  let settling = false;
+  const settle = (): void => {
+    setOffset();
+    if (performance.now() < settleUntil) requestAnimationFrame(settle);
+    else settling = false;
+  };
+  const nudge = (): void => {
+    settleUntil = performance.now() + 800;
+    if (!settling) {
+      settling = true;
+      requestAnimationFrame(settle);
+    }
+  };
+
+  let observed: HTMLElement | null = null;
+  const observer = new ResizeObserver(() => setOffset());
+  const reobserve = (): void => {
+    const sb = findSidebar();
+    if (sb && sb !== observed) {
+      if (observed) observer.unobserve(observed);
+      observer.observe(sb);
+      observed = sb;
+    }
+  };
+
+  setOffset();
+  reobserve();
+
+  Hooks.on("collapseSidebar", nudge);
+  Hooks.on("renderSidebar", () => {
+    reobserve();
+    nudge();
+  });
   window.addEventListener("resize", setOffset);
 }

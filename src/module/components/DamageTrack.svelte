@@ -25,21 +25,20 @@
     });
   }
 
-  const symbol = (s: string) => (s === "a" ? "✕" : s === "s" ? "/" : "");
 </script>
 
 <div class="track">
   {#each states as s, i (i)}
     <span
       class="box"
+      class:sup={s === "s"}
       class:agg={s === "a"}
       role="button"
       tabindex="0"
       aria-label={`Damage box ${i + 1}`}
       onclick={() => cycle(i)}
       onkeydown={(e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), cycle(i))}
-      >{symbol(s)}</span
-    >
+    ></span>
   {/each}
 </div>
 
@@ -54,16 +53,31 @@
     height: var(--gl-box);
     border: 1.5px solid var(--gl-ink);
     cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-family: var(--gl-body);
-    font-weight: 600;
-    font-size: 15px;
-    color: var(--gl-blood);
+    display: inline-block;
+    position: relative;
     background: transparent;
     box-sizing: border-box;
     user-select: none;
+  }
+  /* Damage strokes span the whole box, matching the Humanity stain cross:
+     one diagonal for superficial, two crossed for aggravated. */
+  .box.sup::before,
+  .box.agg::before,
+  .box.agg::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 2px;
+    height: 130%;
+    background: var(--gl-blood-bright);
+  }
+  .box.sup::before,
+  .box.agg::before {
+    transform: translate(-50%, -50%) rotate(45deg);
+  }
+  .box.agg::after {
+    transform: translate(-50%, -50%) rotate(-45deg);
   }
   .box.agg {
     background: #e3d3bd;

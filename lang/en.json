@@ -129,7 +129,26 @@
   "GLUNIVERSE.Settings.AutomateRemorse.Name": "Automate Remorse outcome",
   "GLUNIVERSE.Settings.AutomateRemorse.Hint": "Apply the Remorse result automatically — clear stains on success, lower Humanity on failure.",
   "GLUNIVERSE.Settings.DefaultDifficulty.Name": "Default roll difficulty",
-  "GLUNIVERSE.Settings.DefaultDifficulty.Hint": "The difficulty the dice-pool dialog starts on when a roll doesn't specify one.",
+  "GLUNIVERSE.Settings.DefaultDifficulty.Hint": "The difficulty the dice-pool dialog starts on when a roll doesn't specify one. 0 means no set difficulty: the chat card simply reports the number of successes.",
   "GLUNIVERSE.Settings.GmHud.Name": "Storyteller dice HUD",
-  "GLUNIVERSE.Settings.GmHud.Hint": "Show a floating quick dice-pool roller in the bottom-right corner for Game Masters."
+  "GLUNIVERSE.Settings.GmHud.Hint": "Show a floating quick dice-pool roller in the bottom-right corner for Game Masters.",
+
+  "GLUNIVERSE.Settings.CreationAttributes.Name": "Creation: attribute spread",
+  "GLUNIVERSE.Settings.CreationAttributes.Hint": "Attribute ratings granted at character creation, as a comma-separated list (book default: 4,3,3,3,2,2,2,2,1). A soft limit — the builder warns but never blocks.",
+  "GLUNIVERSE.Settings.CreationSkillsJack.Name": "Creation: skills — Jack-of-all-Trades",
+  "GLUNIVERSE.Settings.CreationSkillsJack.Hint": "Skill ratings for the Jack-of-all-Trades distribution, comma-separated.",
+  "GLUNIVERSE.Settings.CreationSkillsBalanced.Name": "Creation: skills — Balanced",
+  "GLUNIVERSE.Settings.CreationSkillsBalanced.Hint": "Skill ratings for the Balanced distribution, comma-separated.",
+  "GLUNIVERSE.Settings.CreationSkillsSpecialist.Name": "Creation: skills — Specialist",
+  "GLUNIVERSE.Settings.CreationSkillsSpecialist.Hint": "Skill ratings for the Specialist distribution, comma-separated.",
+  "GLUNIVERSE.Settings.CreationDisciplineDots.Name": "Creation: in-clan Discipline dots",
+  "GLUNIVERSE.Settings.CreationDisciplineDots.Hint": "How many in-clan Discipline dots a new character starts with (book default: 2).",
+  "GLUNIVERSE.Settings.CreationAdvantageDots.Name": "Creation: Merit & Background dots",
+  "GLUNIVERSE.Settings.CreationAdvantageDots.Hint": "How many dots of Merits and Backgrounds a new character starts with (book default: 7).",
+  "GLUNIVERSE.Settings.CreationFlawDots.Name": "Creation: minimum Flaw dots",
+  "GLUNIVERSE.Settings.CreationFlawDots.Hint": "How many dots of Flaws a new character must take (book default: 2).",
+  "GLUNIVERSE.Settings.CreationBloodPotency.Name": "Creation: starting Blood Potency",
+  "GLUNIVERSE.Settings.CreationBloodPotency.Hint": "Blood Potency for a freshly created Kindred (book default: 1).",
+  "GLUNIVERSE.Settings.CreationHumanity.Name": "Creation: starting Humanity",
+  "GLUNIVERSE.Settings.CreationHumanity.Hint": "Humanity for a freshly created Kindred (book default: 7)."
 }

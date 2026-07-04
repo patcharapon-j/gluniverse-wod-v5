@@ -88,7 +88,18 @@ export async function handleActorDrop(actor: any, event: DragEvent): Promise<boo
     return sortOnDrop(actor, item, event);
   }
 
-  const obj = item.toObject();
+  await addItemToActor(actor, item);
+  return true;
+}
+
+/**
+ * Add an item document (typically from a compendium) to an actor, applying the
+ * same rules as a drop: Disciplines are de-duplicated (merging the higher
+ * rating), Powers attach to — or create — their parent Discipline instance.
+ * Returns the resulting embedded item, or null if creation failed.
+ */
+export async function addItemToActor(actor: any, item: any): Promise<any> {
+  const obj = item.toObject ? item.toObject() : foundry.utils.deepClone(item);
 
   // Disciplines: never keep two of the same on one actor.
   if (obj.type === "discipline") {
@@ -97,7 +108,7 @@ export async function handleActorDrop(actor: any, event: DragEvent): Promise<boo
       // Merge the higher rating rather than creating a duplicate row.
       const better = Math.max(existing.system?.value ?? 0, obj.system?.value ?? 0);
       if (better !== existing.system?.value) await existing.update({ "system.value": better });
-      return true;
+      return existing;
     }
   }
 
@@ -107,8 +118,8 @@ export async function handleActorDrop(actor: any, event: DragEvent): Promise<boo
     if (parentId) obj.system = { ...obj.system, parentDiscipline: parentId };
   }
 
-  await actor.createEmbeddedDocuments("Item", [obj]);
-  return true;
+  const created = await actor.createEmbeddedDocuments("Item", [obj]);
+  return created?.[0] ?? null;
 }
 
 /** Find an owned Discipline item by its discipline key. */

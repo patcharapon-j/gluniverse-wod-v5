@@ -32,7 +32,7 @@
   let discipline = $state(seed.discipline ?? "");
   let modifier = $state(0);
   /* svelte-ignore state_referenced_locally */
-  let difficulty = $state(seed.difficulty ?? 1);
+  let difficulty = $state(seed.difficulty ?? 0);
   let hunger = $state(sys.hunger ?? 0);
   let bloodSurge = $state(false);
   let chosenSpecs = $state<Record<string, boolean>>({});
@@ -72,7 +72,7 @@
   }
 </script>
 
-<div class="gl-roll">
+<div class="gl-roll" class:surging={bloodSurge}>
   {#if seed.poolLabel}
     <div class="basepool">
       <span class="bp-lbl">{seed.poolLabel}</span>
@@ -137,8 +137,8 @@
       <input type="number" min="0" max="5" bind:value={hunger} />
     </label>
     <label class="knob">
-      <span>Difficulty</span>
-      <input type="number" min="0" bind:value={difficulty} />
+      <span>Difficulty <i>(0 = none)</i></span>
+      <input type="number" min="0" bind:value={difficulty} title="0 — no difficulty: the card just counts successes" />
     </label>
   </div>
 
@@ -162,7 +162,7 @@
         modifier ? `${modifier < 0 ? "−" : "+"}${Math.abs(modifier)}` : "",
         surge ? `${surge} surge` : "",
       ].filter(Boolean).join(" + ")}
-      · <b class="hunger">{Math.min(hunger, totalPool)}</b> Hunger · DC {difficulty}
+      · <b class="hunger">{Math.min(hunger, totalPool)}</b> Hunger · {difficulty > 0 ? `DC ${difficulty}` : "count successes"}
     </div>
   </div>
 
@@ -178,6 +178,59 @@
     background: var(--gl-parch);
     color: var(--gl-ink);
     font-family: var(--gl-body);
+    transition: background 0.4s ease, box-shadow 0.4s ease;
+  }
+
+  /* Blood Surge engaged: the whole dialog flushes red so spending the Rouse
+     feels tactile — parchment tints toward blood, the surge row ignites, and
+     the pool number and Roll button glow. */
+  .gl-roll.surging {
+    background:
+      linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--gl-blood) 16%, var(--gl-parch)),
+        color-mix(in srgb, var(--gl-blood) 6%, var(--gl-parch)) 55%,
+        var(--gl-parch)
+      );
+    box-shadow:
+      inset 0 0 0 1px color-mix(in srgb, var(--gl-blood) 55%, transparent),
+      inset 0 0 48px color-mix(in srgb, var(--gl-blood) 22%, transparent);
+    animation: gl-surge-throb 2.2s ease-in-out infinite;
+  }
+  @keyframes gl-surge-throb {
+    0%, 100% {
+      box-shadow:
+        inset 0 0 0 1px color-mix(in srgb, var(--gl-blood) 55%, transparent),
+        inset 0 0 48px color-mix(in srgb, var(--gl-blood) 22%, transparent);
+    }
+    50% {
+      box-shadow:
+        inset 0 0 0 1px color-mix(in srgb, var(--gl-blood) 75%, transparent),
+        inset 0 0 64px color-mix(in srgb, var(--gl-blood) 34%, transparent);
+    }
+  }
+  .gl-roll.surging .surge {
+    border-color: var(--gl-blood);
+    background: color-mix(in srgb, var(--gl-blood) 12%, transparent);
+  }
+  .gl-roll.surging .surge span {
+    color: var(--gl-blood-bright);
+    font-weight: 600;
+  }
+  .gl-roll.surging .surge span i {
+    color: var(--gl-blood);
+  }
+  .gl-roll.surging .pv-num {
+    color: var(--gl-blood-bright);
+    text-shadow: 0 0 14px color-mix(in srgb, var(--gl-blood-bright) 55%, transparent);
+  }
+  .gl-roll.surging .preview {
+    border-color: color-mix(in srgb, var(--gl-blood) 45%, var(--gl-line));
+  }
+  .gl-roll.surging .btn.go {
+    background: var(--gl-blood-bright);
+    border-color: var(--gl-blood-bright);
+    box-shadow: 0 0 12px color-mix(in srgb, var(--gl-blood-bright) 50%, transparent);
   }
   .basepool {
     display: flex;
@@ -233,7 +286,8 @@
   .specs {
     margin-bottom: 12px;
   }
-  .specs-h i {
+  .specs-h i,
+  .knob span i {
     text-transform: none;
     letter-spacing: 0;
     color: var(--gl-faint);
@@ -283,6 +337,10 @@
     align-items: center;
     gap: 8px;
     margin-bottom: 14px;
+    border: 1px solid transparent;
+    border-radius: 3px;
+    padding: 6px 8px;
+    transition: background 0.3s ease, border-color 0.3s ease;
   }
   .surge input,
   .spec-chip input {
