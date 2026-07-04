@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { slide } from "svelte/transition";
+  import { pulse } from "../apps/anim.ts";
   import { CLANS, PREDATOR_TYPES, RESONANCES, RESONANCE_INTENSITIES, BLOOD_POTENCY } from "../config.ts";
   import { prettify, label } from "../components/labels.ts";
   import {
@@ -271,12 +273,12 @@
           {/each}
         </div>
         <button class="lvl-readout" onclick={() => (showHumanityInfo = !showHumanityInfo)} aria-expanded={showHumanityInfo}>
-          <span class="lvl-num">{sys.humanity.value}</span>
+          <span class="lvl-num" use:pulse={sys.humanity.value}>{sys.humanity.value}</span>
           <span class="lvl-blurb">{humanityInfo.blurb}</span>
           <span class="lvl-caret" class:open={showHumanityInfo}>▸</span>
         </button>
         {#if showHumanityInfo}
-          <ul class="lvl-effects">
+          <ul class="lvl-effects" transition:slide={{ duration: 150 }}>
             {#each humanityInfo.effects as e (e)}<li>{e}</li>{/each}
           </ul>
         {/if}
@@ -290,12 +292,12 @@
           <DotRating value={sys.bloodPotency} max={10} size={11} color="blood" readonly={!editMode} onchange={(n) => up("system.bloodPotency", n)} />
         </div>
         <button class="lvl-readout" onclick={() => (showBpInfo = !showBpInfo)} aria-expanded={showBpInfo}>
-          <span class="lvl-num">{sys.bloodPotency ?? 0}</span>
+          <span class="lvl-num" use:pulse={sys.bloodPotency ?? 0}>{sys.bloodPotency ?? 0}</span>
           <span class="lvl-blurb">{bpInfo.blurb}</span>
           <span class="lvl-caret" class:open={showBpInfo}>▸</span>
         </button>
         {#if showBpInfo}
-          <ul class="lvl-effects">
+          <ul class="lvl-effects" transition:slide={{ duration: 150 }}>
             {#each bpInfo.effects as e (e)}<li>{e}</li>{/each}
           </ul>
         {/if}
@@ -351,7 +353,7 @@
             {#if editMode}<ItemControls onedit={() => editItem(doc, d.id)} ondelete={() => deleteItem(doc, d.id)} />{/if}
           </div>
           {#if expanded[d.id] && d.system.description}
-            <div class="detail">{@html d.system.description}</div>
+            <div class="detail" transition:slide={{ duration: 150 }}>{@html d.system.description}</div>
           {/if}
           {#if !collapsed[d.id]}
             {#each powers as p (p.id)}
@@ -362,7 +364,7 @@
                 {#if editMode}<ItemControls onedit={() => editItem(doc, p.id)} ondelete={() => deleteItem(doc, p.id)} />{/if}
               </div>
               {#if expanded[p.id]}
-                <div class="detail pw-detail">
+                <div class="detail pw-detail" transition:slide={{ duration: 150 }}>
                   <div class="detail-facts">
                     {#if p.system.cost}<span><b>Cost</b> {p.system.cost}</span>{/if}
                     {#if p.system.pool}<span><b>Pool</b> {p.system.pool}</span>{/if}
@@ -405,7 +407,7 @@
                 {#if editMode}<ItemControls onedit={() => editItem(doc, a.id)} ondelete={() => deleteItem(doc, a.id)} />{/if}
               </div>
               {#if expanded[a.id] && a.system.description}
-                <div class="detail">{@html a.system.description}</div>
+                <div class="detail" transition:slide={{ duration: 150 }}>{@html a.system.description}</div>
               {/if}
             {/each}
           </div>
@@ -437,7 +439,7 @@
           {#if editMode}<ItemControls onedit={() => editItem(doc, r.id)} ondelete={() => deleteItem(doc, r.id)} />{/if}
         </div>
         {#if expanded[r.id] && r.system.description}
-          <div class="detail">{@html r.system.description}</div>
+          <div class="detail" transition:slide={{ duration: 150 }}>{@html r.system.description}</div>
         {/if}
       {/each}
     </section>
@@ -465,7 +467,7 @@
           {#if editMode}<ItemControls onedit={() => editItem(doc, w.id)} ondelete={() => deleteItem(doc, w.id)} />{/if}
         </div>
         {#if expanded[w.id]}
-          <div class="detail">
+          <div class="detail" transition:slide={{ duration: 150 }}>
             <div class="detail-facts">
               <span><b>Damage</b> {w.system.damage} {w.system.damageType}</span>
               {#if w.system.pool}<span><b>Pool</b> {w.system.pool}</span>{/if}
@@ -485,7 +487,7 @@
           {#if editMode}<ItemControls onedit={() => editItem(doc, a.id)} ondelete={() => deleteItem(doc, a.id)} />{/if}
         </div>
         {#if expanded[a.id]}
-          <div class="detail">
+          <div class="detail" transition:slide={{ duration: 150 }}>
             <div class="detail-facts">
               <span><b>Rating</b> {a.system.rating}</span>
               {#if a.system.type}<span><b>Type</b> {a.system.type}</span>{/if}
@@ -502,7 +504,7 @@
           {#if editMode}<ItemControls onedit={() => editItem(doc, g.id)} ondelete={() => deleteItem(doc, g.id)} />{/if}
         </div>
         {#if expanded[g.id]}
-          <div class="detail">
+          <div class="detail" transition:slide={{ duration: 150 }}>
             <div class="detail-facts">
               <span><b>Qty</b> {g.system.quantity}</span>
               {#if g.system.cost}<span><b>Cost</b> {g.system.cost}</span>{/if}
@@ -957,9 +959,18 @@
     flex: none;
     background: transparent;
     box-sizing: border-box;
+    transition: background 0.18s ease, box-shadow 0.25s ease, transform 0.12s ease;
+  }
+  .dia:hover {
+    transform: rotate(45deg) scale(1.1);
+  }
+  .dia:focus-visible {
+    outline: 2px solid var(--gl-blood);
+    outline-offset: 1px;
   }
   .dia.on {
     background: var(--gl-blood-bright);
+    box-shadow: 0 0 7px color-mix(in srgb, var(--gl-blood-bright) 45%, transparent);
   }
   .humanity {
     display: flex;
@@ -976,19 +987,33 @@
     position: relative;
     background: transparent;
     box-sizing: border-box;
+    transition: background 0.18s ease, border-color 0.12s ease;
+  }
+  .ubox:hover {
+    border-color: var(--gl-blood);
+  }
+  .ubox:focus-visible {
+    outline: 2px solid var(--gl-blood);
+    outline-offset: 1px;
   }
   .ubox.on {
     background: var(--gl-ink);
   }
-  .ubox.stain::after {
+  /* The stain slash is always present but collapsed, so gaining a Stain draws
+     the stroke in — the same knife-stroke read as the damage tracks. */
+  .ubox::after {
     content: "";
     position: absolute;
     top: 50%;
     left: 50%;
     width: 2px;
     height: 26px;
-    transform: translate(-50%, -50%) rotate(45deg);
+    transform: translate(-50%, -50%) rotate(45deg) scaleY(0);
     background: var(--gl-blood-bright);
+    transition: transform 0.18s ease-out;
+  }
+  .ubox.stain::after {
+    transform: translate(-50%, -50%) rotate(45deg) scaleY(1);
   }
   .stainctl {
     display: flex;

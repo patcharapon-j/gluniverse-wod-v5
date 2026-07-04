@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { slide } from "svelte/transition";
   import { prettify } from "../components/labels.ts";
   import DotRating from "../components/DotRating.svelte";
   import DamageTrack from "../components/DamageTrack.svelte";
@@ -230,7 +231,7 @@
           {#if editMode}<ItemControls onedit={() => editItem(doc, g.id)} ondelete={() => deleteItem(doc, g.id)} />{/if}
         </div>
         {#if expanded[g.id]}
-          <div class="detail">
+          <div class="detail" transition:slide={{ duration: 150 }}>
             <div class="detail-facts">
               {#if g.type === "weapon"}
                 <span><b>Damage</b> {g.system.damage} {g.system.damageType}</span>
@@ -570,6 +571,7 @@
     width: 20px;
     height: 20px;
     border: 1.5px solid var(--gl-ink);
+    transition: background 0.18s ease, border-color 0.12s ease;
     cursor: pointer;
     display: inline-block;
     flex: none;
@@ -580,15 +582,27 @@
   .ubox.on {
     background: var(--gl-ink);
   }
-  .ubox.stain::after {
+  .ubox:hover {
+    border-color: var(--gl-blood);
+  }
+  .ubox:focus-visible {
+    outline: 2px solid var(--gl-blood);
+    outline-offset: 1px;
+  }
+  /* Stain slash draws in like the damage-track strokes. */
+  .ubox::after {
     content: "";
     position: absolute;
     top: 50%;
     left: 50%;
     width: 2px;
     height: 26px;
-    transform: translate(-50%, -50%) rotate(45deg);
+    transform: translate(-50%, -50%) rotate(45deg) scaleY(0);
     background: var(--gl-blood-bright);
+    transition: transform 0.18s ease-out;
+  }
+  .ubox.stain::after {
+    transform: translate(-50%, -50%) rotate(45deg) scaleY(1);
   }
   .stainctl {
     display: flex;

@@ -14,6 +14,14 @@ import { rollCardHTML, renderDiceTooltip } from "./chat.ts";
 const MAX_WP_REROLL = 3;
 
 /**
+ * Message ids whose next render should play the card entrance animation.
+ * Populated on message creation (all clients) and on a Willpower re-roll
+ * rewrite, and consumed by the render hook — so re-renders of the chat log
+ * (reload, scroll-back, popout) never replay the choreography.
+ */
+const pendingCardAnimations = new Set<string>();
+
+/**
  * Enter selection mode on the card: the player clicks up to three regular dice
  * to re-roll (V5 core — Hunger dice are never eligible), then confirms. The
  * card's action row is swapped for confirm/cancel; cancel restores it. All of
@@ -144,6 +152,7 @@ async function performWillpowerReroll(
   // Edit the original message in place; append the re-roll's dice to its rolls.
   // The `dice-so-nice.skip` flag stops DSN from animating the appended roll a
   // second time (its updateChatMessage hook) — we already showed it above.
+  if (message.id) pendingCardAnimations.add(message.id);
   const rolls = [...(message.rolls ?? []), redo.roll];
   await message.update({
     content,
@@ -169,6 +178,14 @@ function onAction(message: any, button: HTMLElement): void {
 }
 
 function bind(message: any, root: HTMLElement): void {
+  // Play the entrance choreography once per fresh card (see the CSS in
+  // gluniverse-wod.css). `root` is the .chat-message element itself.
+  if (message.id && pendingCardAnimations.delete(message.id)) {
+    const el = root.classList?.contains("chat-message")
+      ? root
+      : root.closest?.(".chat-message") ?? root;
+    el.classList.add("gl-anim");
+  }
   root.querySelectorAll<HTMLElement>("[data-gl-action]").forEach((btn) => {
     // Both render hooks can fire for one message on v13; bind each button once.
     if (btn.dataset.glBound) return;
@@ -182,6 +199,11 @@ function bind(message: any, root: HTMLElement): void {
 
 /** Register both the modern and legacy render hooks (only one will fire). */
 export function registerChatActions(): void {
+  // Fires on every client when a message arrives, before the chat log renders
+  // it — flagging here is what lets bind() animate only genuinely new cards.
+  Hooks.on("createChatMessage", (message: any) => {
+    if (message?.id && message.flags?.[SYSTEM_ID]) pendingCardAnimations.add(message.id);
+  });
   Hooks.on("renderChatMessageHTML", (message: any, html: HTMLElement) => {
     bind(message, html);
   });
