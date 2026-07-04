@@ -80,6 +80,12 @@ export class AdvantageData extends (foundry.abstract.TypeDataModel as any) {
       kind: str("merit", { choices: [...ADVANTAGE_KINDS] }),
       value: int(1, { min: 0, max: 5 }),
       maxValue: int(5, { min: 0, max: 5 }),
+      // Optional specifier shown parenthetically after the name, e.g. the prey a
+      // Prey Exclusion names, or which Discipline a Discipline flaw ingrains.
+      detail: str(),
+      // Grouping label (e.g. "Haven", "Feeding", "Mythic") used to organize the
+      // long Merit/Flaw lists in the character builder.
+      category: str(),
     };
   }
 }

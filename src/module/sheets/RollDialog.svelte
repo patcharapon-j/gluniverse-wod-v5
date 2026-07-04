@@ -2,6 +2,7 @@
   import { ATTRIBUTE_KEYS, SKILL_KEYS } from "../config.ts";
   import { label, prettify } from "../components/labels.ts";
   import { disciplineRating } from "../dice/pool.ts";
+  import { resonanceDieBonus } from "../vtm/lore.ts";
   import type { RollSeed, RollDialogResult } from "../apps/RollDialogApp.ts";
 
   /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -35,6 +36,7 @@
   let difficulty = $state(seed.difficulty ?? 0);
   let hunger = $state(sys.hunger ?? 0);
   let bloodSurge = $state(false);
+  let useResonance = $state(true);
   let chosenSpecs = $state<Record<string, boolean>>({});
 
   /* svelte-ignore state_referenced_locally */
@@ -46,8 +48,27 @@
   const specialties = $derived<string[]>(skill ? (sys.skills?.[skill]?.specialties ?? []) : []);
   const specBonus = $derived(specialties.filter((s) => chosenSpecs[s]).length);
   const surge = $derived(bloodSurge ? bloodSurgeBonus(sys.bloodPotency ?? 0) : 0);
-  const pool = $derived(Math.max(0, fixedPool + attrVal + skillVal + discVal + specBonus + modifier));
+
+  // Resonance: an Intense/Acute draught grants +dice to its linked Disciplines.
+  // It applies when the roll uses such a Discipline — either picked here or,
+  // for a power that resolved its own pool, named via `seed.resonanceFor`.
+  const resoDisc = $derived(discipline || seed.resonanceFor || "");
+  const resoAvail = $derived.by(() => {
+    const b = resonanceDieBonus(sys.resonance);
+    return b.dice > 0 && resoDisc && b.disciplines.includes(resoDisc as any)
+      ? b
+      : { dice: 0, disciplines: [] as string[] };
+  });
+  const resonance = $derived(useResonance ? resoAvail.dice : 0);
+
+  const pool = $derived(
+    Math.max(0, fixedPool + attrVal + skillVal + discVal + specBonus + modifier + resonance),
+  );
   const totalPool = $derived(pool + surge);
+
+  // Tactile dice tray: split the pool into normal (black) and Hunger (red) dice.
+  const hungerDice = $derived(Math.min(Math.max(0, hunger), totalPool));
+  const normalDice = $derived(totalPool - hungerDice);
 
   // Local mirror of the blood-surge table so the preview matches the roll.
   function bloodSurgeBonus(bp: number): number {
@@ -147,6 +168,13 @@
     <span>Blood Surge <i>(+{bloodSurgeBonus(sys.bloodPotency ?? 0)} dice, costs a Rouse check)</i></span>
   </label>
 
+  {#if resoAvail.dice > 0}
+    <label class="surge reso-toggle" class:on={useResonance}>
+      <input type="checkbox" bind:checked={useResonance} />
+      <span>Resonance <i>(+{resoAvail.dice} to {label("Disciplines", resoDisc)} — {prettify(sys.resonance?.type ?? "")})</i></span>
+    </label>
+  {/if}
+
   <div class="preview">
     <div class="pv-pool">
       <span class="pv-num">{totalPool}</span>
@@ -160,11 +188,25 @@
         discVal ? `${discVal} disc` : "",
         specBonus ? `${specBonus} spec` : "",
         modifier ? `${modifier < 0 ? "−" : "+"}${Math.abs(modifier)}` : "",
+        resonance ? `${resonance} reso` : "",
         surge ? `${surge} surge` : "",
       ].filter(Boolean).join(" + ")}
-      · <b class="hunger">{Math.min(hunger, totalPool)}</b> Hunger · {difficulty > 0 ? `DC ${difficulty}` : "count successes"}
+      · <b class="hunger">{hungerDice}</b> Hunger · {difficulty > 0 ? `DC ${difficulty}` : "count successes"}
     </div>
   </div>
+
+  <!-- Tactile dice tray: black stones are the pool, blood-red stones are Hunger.
+       Seeing the red creep in is meant to make the Hunger felt, not just counted. -->
+  {#if totalPool > 0}
+    <div class="dice-tray" aria-hidden="true">
+      {#each Array.from({ length: normalDice }, (_, i) => i) as i (`n${i}`)}
+        <span class="die"></span>
+      {/each}
+      {#each Array.from({ length: hungerDice }, (_, i) => i) as i (`h${i}`)}
+        <span class="die hunger"></span>
+      {/each}
+    </div>
+  {/if}
 
   <div class="actions">
     <button class="btn ghost" onclick={oncancel}>Cancel</button>
@@ -381,6 +423,105 @@
   }
   .pv-break .hunger {
     color: var(--gl-blood-bright);
+  }
+
+  /* Resonance toggle lights gold rather than blood — it empowers, it doesn't
+     cost. */
+  .reso-toggle.on {
+    border-color: var(--gl-gold, #c8a86b);
+    background: color-mix(in srgb, var(--gl-gold, #c8a86b) 12%, transparent);
+  }
+  .reso-toggle.on span {
+    color: var(--gl-gold, #c8a86b);
+    font-weight: 600;
+  }
+  .reso-toggle.on span i {
+    color: color-mix(in srgb, var(--gl-gold, #c8a86b) 80%, var(--gl-ink));
+  }
+
+  /* Dice tray — one stone per die, so the pool has a physical weight. Normal
+     dice are dark; Hunger dice glow blood-red with a soft pulse. */
+  .dice-tray {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 14px;
+  }
+  /* Normal dice are frosted glass — translucent, blurred, catching light — so
+     the pool reads as cool and inert against the blood-red Hunger stones. */
+  .die {
+    width: 22px;
+    height: 22px;
+    border-radius: 6px;
+    flex: none;
+    box-sizing: border-box;
+    position: relative;
+    overflow: hidden;
+    background:
+      linear-gradient(155deg, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0.12));
+    backdrop-filter: blur(6px) saturate(130%);
+    -webkit-backdrop-filter: blur(6px) saturate(130%);
+    border: 1px solid rgba(255, 255, 255, 0.6);
+    box-shadow:
+      inset 0 1px 1px rgba(255, 255, 255, 0.75),
+      inset 0 -3px 6px rgba(40, 20, 25, 0.1),
+      0 1px 3px rgba(20, 10, 12, 0.18);
+  }
+  /* A slanted glare streak sells the glass. */
+  .die::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      125deg,
+      rgba(255, 255, 255, 0.5) 0%,
+      rgba(255, 255, 255, 0) 42%
+    );
+    pointer-events: none;
+  }
+  /* A small centred pip evokes a d10 face without drawing a whole die. */
+  .die::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 5px;
+    height: 5px;
+    transform: translate(-50%, -50%) rotate(45deg);
+    background: rgba(60, 38, 42, 0.4);
+    border-radius: 1px;
+  }
+  .die.hunger {
+    background:
+      radial-gradient(
+        circle at 50% 38%,
+        var(--gl-blood-bright, #d21f28),
+        var(--gl-blood, #7a1016) 78%
+      );
+    border-color: #4a0206;
+    box-shadow:
+      inset 0 1px 1px rgba(255, 255, 255, 0.22),
+      inset 0 -2px 4px rgba(0, 0, 0, 0.5),
+      0 0 8px color-mix(in srgb, var(--gl-blood-bright, #d21f28) 65%, transparent);
+    animation: gl-hunger-pulse 2.4s ease-in-out infinite;
+  }
+  .die.hunger::after {
+    background: rgba(255, 235, 235, 0.9);
+  }
+  @keyframes gl-hunger-pulse {
+    0%,
+    100% {
+      box-shadow:
+        inset 0 1px 1px rgba(255, 255, 255, 0.22),
+        inset 0 -2px 4px rgba(0, 0, 0, 0.5),
+        0 0 8px color-mix(in srgb, var(--gl-blood-bright, #d21f28) 55%, transparent);
+    }
+    50% {
+      box-shadow:
+        inset 0 1px 1px rgba(255, 255, 255, 0.22),
+        inset 0 -2px 4px rgba(0, 0, 0, 0.5),
+        0 0 14px color-mix(in srgb, var(--gl-blood-bright, #d21f28) 85%, transparent);
+    }
   }
   .actions {
     display: flex;

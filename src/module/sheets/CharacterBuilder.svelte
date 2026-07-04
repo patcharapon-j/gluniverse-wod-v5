@@ -18,8 +18,10 @@
   } from "../config.ts";
   import { label, prettify } from "../components/labels.ts";
   import { inClanDisciplines, clanBane, clanCompulsion } from "../vtm/clans.ts";
+  import { predatorProfile } from "../vtm/predators.ts";
   import { getCreationRules, compareSpread } from "../vtm/creation.ts";
   import { addItemToActor } from "../apps/actor-items.ts";
+  import { applyPredatorGrants, clearPredatorGrants } from "../apps/predator.ts";
 
   /* eslint-disable @typescript-eslint/no-explicit-any */
   interface Props {
@@ -64,6 +66,47 @@
     packsLoaded = true;
   }
   loadPacks();
+
+  // --- predator type benefits -------------------------------------------------
+  const advByName = $derived(new Map(packAdvantages.map((a) => [a.name, a])));
+  const predProfile = $derived(sys.predator ? predatorProfile(sys.predator) : undefined);
+  const predGrant = $derived((snap.flags as any)?.[SYSTEM_ID]?.predatorGrants);
+  const predApplied = $derived(!!sys.predator && predGrant?.predator === sys.predator);
+  const forbiddenForClan = $derived(!!predProfile?.forbiddenClans?.includes(sys.clan ?? ""));
+
+  let predChoices = $state<Record<number, any>>({});
+  let lastPredator = $state<string>("__init__");
+  $effect(() => {
+    const p = sys.predator ?? "";
+    if (p === lastPredator) return;
+    lastPredator = p;
+    const prof = predatorProfile(p);
+    const init: Record<number, any> = {};
+    prof?.benefits.forEach((b, i) => {
+      if (b.kind === "specialty" || b.kind === "discipline" || b.kind === "advantageChoice") init[i] = 0;
+      else if (b.kind === "pool") init[i] = Object.fromEntries(b.among.map((n) => [n, 0]));
+    });
+    predChoices = init;
+  });
+
+  const poolRemaining = (idx: number, total: number): number => {
+    const alloc = predChoices[idx] ?? {};
+    return total - Object.values(alloc).reduce((n: number, v) => n + Number(v || 0), 0);
+  };
+  function setPoolDot(idx: number, name: string, n: number, total: number) {
+    const alloc = { ...(predChoices[idx] ?? {}) };
+    const others = Object.entries(alloc).reduce((s, [k, v]) => (k === name ? s : s + Number(v || 0)), 0);
+    alloc[name] = Math.max(0, Math.min(n, total - others));
+    predChoices = { ...predChoices, [idx]: alloc };
+  }
+  const pickOption = (idx: number, oi: number) => (predChoices = { ...predChoices, [idx]: oi });
+
+  async function applyPredator() {
+    if (predProfile && sys.predator) await applyPredatorGrants(doc, sys.predator, predProfile, predChoices, advByName);
+  }
+  const removePredator = () => clearPredatorGrants(doc);
+
+  const dots = (n: number) => "•".repeat(n);
 
   // --- budget checks (all soft) -------------------------------------------------
   const ATTRIBUTE_ENTRIES = Object.entries(ATTRIBUTES) as [string, readonly string[]][];
@@ -142,6 +185,7 @@
     if (!String(snap.name ?? "").trim() || /^new actor/i.test(snap.name)) w.push("Give the character a name.");
     if (!sys.clan) w.push("Choose a clan — it decides the in-clan Disciplines.");
     if (!sys.predator) w.push("Choose a predator type.");
+    else if (!predApplied) w.push("Add the predator type's feeding benefits to the sheet.");
     return w;
   });
 
@@ -244,6 +288,38 @@
         (!advSearch.trim() || a.name.toLowerCase().includes(advSearch.trim().toLowerCase())),
     ),
   );
+
+  // The Merit/Flaw lists are long, so group them by category (Haven, Feeding,
+  // Mythic, …); Loresheets group by their source book. Categories render in
+  // rulebook order, with anything unrecognized falling to the end.
+  const CATEGORY_ORDER = [
+    "Backgrounds", "Haven", "Looks", "Substance Use", "Archaic", "Bonding", "Feeding",
+    "Mythic", "Psychological", "Miscellaneous", "Blood Ties", "Contagion",
+    "Ingrained Discipline", "Caitiff", "Thin-Blood", "Ghoul", "Cults", "Coterie",
+  ];
+  let advOpenGroups = $state<Record<string, boolean>>({});
+  const advGroups = $derived.by(() => {
+    const byLore = advTab === "loresheet";
+    const map = new Map<string, any[]>();
+    for (const a of advList) {
+      const key = (byLore ? a.system?.source : a.system?.category) || "Other";
+      (map.get(key) ?? map.set(key, []).get(key)!).push(a);
+    }
+    const rank = (k: string) => {
+      if (byLore) return k === "Core" ? -1 : 0; // Core first, rest alphabetical
+      const i = CATEGORY_ORDER.indexOf(k);
+      return i < 0 ? 999 : i;
+    };
+    return [...map.keys()]
+      .sort((a, b) => rank(a) - rank(b) || a.localeCompare(b))
+      .map((name) => ({ name, items: map.get(name)! }));
+  });
+  const advGroupOpen = (name: string) =>
+    !!advSearch.trim() || advOpenGroups[`${advTab}:${name}`] !== false;
+  const toggleAdvGroup = (name: string) => {
+    const k = `${advTab}:${name}`;
+    advOpenGroups[k] = advOpenGroups[k] === false;
+  };
   const EQ_TABS = [
     { key: "weapon", label: "Weapons" },
     { key: "armor", label: "Armor" },
@@ -321,6 +397,79 @@
           </div>
           <div class="ci-row"><b>Bane</b> {clanBane(sys.clan)}</div>
           <div class="ci-row"><b>Compulsion</b> {clanCompulsion(sys.clan)}</div>
+        </div>
+      {/if}
+
+      {#if sys.predator && predProfile}
+        <div class="predinfo">
+          <div class="pi-head">
+            <span class="pi-title">{label("PredatorTypes", sys.predator)} — feeding benefits</span>
+            {#if predApplied}
+              <span class="pi-applied">✓ Added to sheet</span>
+              <button class="row-add" onclick={removePredator}>Remove</button>
+            {:else}
+              <button class="row-add on" disabled={!packsLoaded} onclick={applyPredator}>+ Add to sheet</button>
+            {/if}
+          </div>
+          <p class="pi-src">{predProfile.summary} <em>({predProfile.source})</em></p>
+          {#if forbiddenForClan}
+            <p class="pi-forbidden">⚠ {label("Clans", sys.clan)} cannot normally take this predator type.</p>
+          {/if}
+          <ul class="pi-list">
+            {#each predProfile.benefits as b, i (i)}
+              <li class="pi-b">
+                {#if b.kind === "specialty"}
+                  <span class="pi-k">Specialty</span>
+                  <span class="pi-opts">
+                    {#each b.options as o, oi (oi)}
+                      <button class="chipbtn" class:sel={(predChoices[i] ?? 0) === oi} onclick={() => pickOption(i, oi)}>{label("Skills", o.skill)} ({o.specialty})</button>
+                    {/each}
+                  </span>
+                {:else if b.kind === "discipline"}
+                  <span class="pi-k">Discipline +{b.dots}</span>
+                  <span class="pi-opts">
+                    {#each b.options as o, oi (oi)}
+                      <button class="chipbtn" class:sel={(predChoices[i] ?? 0) === oi} onclick={() => pickOption(i, oi)}>{label("Disciplines", o)}</button>
+                    {/each}
+                  </span>
+                  {#if b.note}<span class="pi-note">{b.note}</span>{/if}
+                {:else if b.kind === "advantage"}
+                  <span class="pi-k">{prettify(b.advKind)}</span>
+                  <span class="pi-fixed">{b.name} <b class="pi-dots">{dots(b.dots)}</b>{#if b.note} <span class="pi-note">({b.note})</span>{/if}</span>
+                {:else if b.kind === "advantageChoice"}
+                  <span class="pi-k">{prettify(b.advKind)}</span>
+                  <span class="pi-opts">
+                    {#each b.options as o, oi (oi)}
+                      <button class="chipbtn" class:sel={(predChoices[i] ?? 0) === oi} onclick={() => pickOption(i, oi)}>{o.name} {dots(o.dots)}{#if o.note} ({o.note}){/if}</button>
+                    {/each}
+                  </span>
+                {:else if b.kind === "pool"}
+                  <span class="pi-k">{b.dots} {prettify(b.advKind)} dot{b.dots > 1 ? "s" : ""}</span>
+                  <span class="pi-opts pool">
+                    {#each b.among as name (name)}
+                      <span class="pool-item">
+                        <span class="pool-name">{name}</span>
+                        <span class="numsel">
+                          <button class="ns clear" class:sel={(predChoices[i]?.[name] ?? 0) === 0} onclick={() => setPoolDot(i, name, 0, b.dots)}>–</button>
+                          {#each Array.from({ length: b.dots }, (_, k) => k + 1) as n (n)}
+                            <button class="ns" class:sel={(predChoices[i]?.[name] ?? 0) === n} onclick={() => setPoolDot(i, name, n, b.dots)}>{n}</button>
+                          {/each}
+                        </span>
+                      </span>
+                    {/each}
+                    <span class="pool-left" class:done={poolRemaining(i, b.dots) === 0}>{poolRemaining(i, b.dots)} left</span>
+                  </span>
+                  {#if b.note}<span class="pi-note">{b.note}</span>{/if}
+                {:else if b.kind === "trait"}
+                  <span class="pi-k">Trait</span>
+                  <span class="pi-fixed">{b.delta > 0 ? "+" : ""}{b.delta} {prettify(b.trait)}</span>
+                {/if}
+              </li>
+            {/each}
+          </ul>
+          {#if !predApplied}
+            <p class="pi-hint">Pick your options, then add them to the sheet. Switching predator type or pressing Remove clears these grants.</p>
+          {/if}
         </div>
       {/if}
 
@@ -528,37 +677,51 @@
       {:else if advList.length === 0}
         <p class="loading">Nothing here{advSearch ? ` matching “${advSearch}”` : ""}.</p>
       {:else}
-        {#each advList as a (a.id)}
-          {@const owned = ownedAdv(a)}
-          <div class="row" class:owned>
-            <span class="row-main">
-              <span class="row-name" class:flaw={advTab === "flaw"}>{a.name}</span>
-              <span class="row-detail">
-                {#if (a.system.maxValue ?? 5) !== (a.system.value ?? 1)}<b>Dots</b> {a.system.value}–{a.system.maxValue}{:else}<b>Dots</b> {a.system.value}{/if}
-              </span>
-              {#if a.system.description}<span class="row-desc">{@html a.system.description}</span>{/if}
-            </span>
-            {#if owned}
-              {@const max = owned.system.maxValue || 5}
-              {@const counted = ["merit", "background"].includes(advTab)}
-              <span class="numsel">
-                {#each Array.from({ length: max }, (_, i) => i + 1) as n (n)}
-                  <button
-                    class="ns"
-                    class:sel={owned.system.value === n}
-                    class:dep={owned.system.value !== n && counted && advDots - owned.system.value + n > rules.advantageDots}
-                    title={counted && advDots - owned.system.value + n > rules.advantageDots
-                      ? `Set to ${n} — exceeds the creation budget`
-                      : `Set to ${n}`}
-                    onclick={() => doc.items.get(owned.id)?.update({ "system.value": n })}
-                  >{n}</button>
-                {/each}
-              </span>
-            {/if}
-            <button class="row-add" class:on={!!owned} onclick={() => toggle(owned, a)}>
-              {owned ? "✕ Remove" : "+ Add"}
+        {@const grouped = advGroups.length > 1}
+        {#each advGroups as g (g.name)}
+          {@const openG = advGroupOpen(g.name)}
+          {#if grouped}
+            {@const ownedCount = g.items.filter((x) => ownedAdv(x)).length}
+            <button class="adv-grp" class:open={openG} onclick={() => toggleAdvGroup(g.name)}>
+              <span class="grp-caret">▸</span>
+              <span class="grp-name">{g.name}</span>
+              <span class="grp-count">{#if ownedCount}<b>{ownedCount}</b> / {/if}{g.items.length}</span>
             </button>
-          </div>
+          {/if}
+          {#if openG}
+            {#each g.items as a (a.id)}
+              {@const owned = ownedAdv(a)}
+              <div class="row" class:owned class:ingrp={grouped}>
+                <span class="row-main">
+                  <span class="row-name" class:flaw={advTab === "flaw"}>{a.name}</span>
+                  <span class="row-detail">
+                    {#if (a.system.maxValue ?? 5) !== (a.system.value ?? 1)}<b>Dots</b> {a.system.value}–{a.system.maxValue}{:else}<b>Dots</b> {a.system.value}{/if}
+                  </span>
+                  {#if a.system.description}<span class="row-desc">{@html a.system.description}</span>{/if}
+                </span>
+                {#if owned}
+                  {@const max = owned.system.maxValue || 5}
+                  {@const counted = ["merit", "background"].includes(advTab)}
+                  <span class="numsel">
+                    {#each Array.from({ length: max }, (_, i) => i + 1) as n (n)}
+                      <button
+                        class="ns"
+                        class:sel={owned.system.value === n}
+                        class:dep={owned.system.value !== n && counted && advDots - owned.system.value + n > rules.advantageDots}
+                        title={counted && advDots - owned.system.value + n > rules.advantageDots
+                          ? `Set to ${n} — exceeds the creation budget`
+                          : `Set to ${n}`}
+                        onclick={() => doc.items.get(owned.id)?.update({ "system.value": n })}
+                      >{n}</button>
+                    {/each}
+                  </span>
+                {/if}
+                <button class="row-add" class:on={!!owned} onclick={() => toggle(owned, a)}>
+                  {owned ? "✕ Remove" : "+ Add"}
+                </button>
+              </div>
+            {/each}
+          {/if}
         {/each}
       {/if}
 
@@ -795,6 +958,133 @@
     font-size: 11px;
   }
 
+  /* predator benefits panel */
+  .predinfo {
+    background: var(--gl-parch-raise);
+    border: 1px solid var(--gl-line);
+    border-left: 3px solid var(--gl-blood);
+    padding: 10px 14px;
+    margin-top: 12px;
+  }
+  .pi-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .pi-title {
+    font-family: var(--gl-serif);
+    font-weight: 700;
+    font-size: 15px;
+    flex: 1;
+  }
+  .pi-applied {
+    font-family: var(--gl-cond);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-size: 10px;
+    color: var(--gl-good);
+  }
+  .pi-src {
+    font-size: 12px;
+    color: var(--gl-muted-2);
+    margin: 4px 0 8px;
+  }
+  .pi-forbidden {
+    font-size: 11px;
+    color: var(--gl-blood);
+    margin: 0 0 8px;
+  }
+  .pi-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  .pi-b {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 0;
+    border-top: 1px dotted var(--gl-line-soft);
+    font-size: 12px;
+  }
+  .pi-k {
+    font-family: var(--gl-cond);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-size: 9px;
+    color: var(--gl-blood);
+    min-width: 96px;
+    flex: none;
+  }
+  .pi-opts {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 5px;
+  }
+  .pi-opts.pool {
+    gap: 12px;
+  }
+  .pi-fixed {
+    font-family: var(--gl-semi);
+    font-weight: 600;
+  }
+  .pi-dots {
+    color: var(--gl-blood);
+    letter-spacing: 1px;
+  }
+  .pi-note {
+    font-style: italic;
+    color: var(--gl-muted);
+    font-size: 11px;
+  }
+  .chipbtn {
+    font-family: var(--gl-semi);
+    font-size: 11px;
+    color: var(--gl-ink);
+    background: transparent;
+    border: 1px solid var(--gl-line);
+    border-radius: 3px;
+    padding: 2px 8px;
+    cursor: pointer;
+  }
+  .chipbtn:hover {
+    border-color: var(--gl-blood);
+    color: var(--gl-blood);
+  }
+  .chipbtn.sel {
+    color: var(--gl-parch);
+    background: var(--gl-blood);
+    border-color: var(--gl-blood);
+  }
+  .pool-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .pool-name {
+    font-family: var(--gl-semi);
+    font-weight: 600;
+    font-size: 11px;
+  }
+  .pool-left {
+    font-family: var(--gl-cond);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-size: 9px;
+    color: var(--gl-muted-2);
+  }
+  .pool-left.done {
+    color: var(--gl-good);
+  }
+  .pi-hint {
+    font-size: 11px;
+    color: var(--gl-muted-2);
+    font-style: italic;
+    margin: 8px 0 0;
+  }
+
   /* rating tracker legend */
   .legend {
     position: sticky;
@@ -1009,6 +1299,49 @@
   }
 
   /* generic catalogue row */
+  /* category group headers in the Advantages step */
+  .adv-grp {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    margin-top: 10px;
+    padding: 5px 4px;
+    background: var(--gl-parch-raise);
+    border: none;
+    border-bottom: 1px solid var(--gl-line);
+    cursor: pointer;
+    text-align: left;
+  }
+  .adv-grp:hover {
+    background: color-mix(in srgb, var(--gl-blood) 6%, var(--gl-parch-raise));
+  }
+  .grp-caret {
+    color: var(--gl-muted);
+    font-size: 10px;
+    transition: transform 0.12s;
+  }
+  .adv-grp.open .grp-caret {
+    transform: rotate(90deg);
+  }
+  .grp-name {
+    flex: 1;
+    font-family: var(--gl-cond);
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--gl-ink);
+  }
+  .grp-count {
+    font-family: var(--gl-cond);
+    font-size: 10px;
+    letter-spacing: 1px;
+    color: var(--gl-muted);
+  }
+  .grp-count b {
+    color: var(--gl-good);
+  }
   .row {
     display: flex;
     align-items: flex-start;
@@ -1016,6 +1349,9 @@
     padding: 6px 2px 6px 20px;
     border-top: 1px dotted var(--gl-line-soft);
     font-size: 12px;
+  }
+  .row.ingrp {
+    padding-left: 28px;
   }
   .row.owned {
     background: color-mix(in srgb, var(--gl-good) 7%, transparent);

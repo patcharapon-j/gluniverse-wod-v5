@@ -103,6 +103,7 @@ export const Adv = (e) => ({
     kind: e.kind ?? "merit",
     value: e.value ?? 1,
     maxValue: e.maxValue ?? e.value ?? 5,
+    category: e.category ?? "",
   },
 });
 
