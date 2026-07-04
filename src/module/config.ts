@@ -125,6 +125,7 @@ export const PREDATOR_TYPES = [
   "montero",
   "pursuer",
   "trapdoor",
+  "titheCollector",
 ] as const;
 export type PredatorType = (typeof PREDATOR_TYPES)[number];
 

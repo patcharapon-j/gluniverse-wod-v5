@@ -24,6 +24,7 @@ const PRED_KEY = {
   "Scene Queen": "sceneQueen", Siren: "siren", Extortionist: "extortionist",
   Graverobber: "graverobber", "Roadside Killer": "roadsideKiller", "Grim Reaper": "grimReaper",
   Montero: "montero", Pursuer: "pursuer", Trapdoor: "trapdoor",
+  "Tithe Collector": "titheCollector",
 };
 
 /* Build a clan journal page: original summary + a mechanical facts block. */
@@ -39,12 +40,13 @@ function clan(name, summary, { disciplines, bane, compulsion }) {
 }
 
 /* Build a predator-type journal page: original feeding style + benefit hooks. */
-function predator(name, style, benefits) {
+function predator(name, style, benefits, source = "Core") {
   const content =
     `<p>${style}</p>` +
     `<hr/>` +
-    `<p><strong>Typical Benefits:</strong></p>` +
-    `<ul>${benefits.map((b) => `<li>${b}</li>`).join("")}</ul>`;
+    `<p><strong>Feeding Benefits:</strong></p>` +
+    `<ul>${benefits.map((b) => `<li>${b}</li>`).join("")}</ul>` +
+    `<p><em>Source: ${source}</em></p>`;
   const flags = PRED_KEY[name] ? { [SYSTEM_ID]: { predatorKey: PRED_KEY[name] } } : undefined;
   return Journal({ name: `Predator: ${name}`, flags, pages: [{ name, content }] });
 }
@@ -134,90 +136,112 @@ const clans = [
 
 const predators = [
   predator("Alley Cat", "You hunt by ambush and intimidation, taking blood by force from those the world won't miss.", [
-    "A dot of Celerity or Potence",
-    "A specialty in Intimidation (Stalking) or Brawl (Grappling)",
-    "Ties to the criminal underworld",
-  ]),
-  predator("Bagger", "You feed on stored, bagged, or stolen blood rather than the living — clinical, discreet, and cold.", [
-    "The Iron Gullet merit to stomach old blood",
-    "A dot of Blood Sorcery or a fitting utility Discipline",
-    "A contact in the medical or morgue trade",
-  ]),
+    "Specialty: Intimidation (Stickups) or Brawl (Grappling)",
+    "Gain one dot of Celerity or Potence",
+    "Lose one dot of Humanity",
+    "Gain three dots of Criminal Contacts",
+  ], "Core"),
+  predator("Bagger", "You feed on stored, bagged, or stolen blood rather than the living — clinical, discreet, and cold. Ventrue cannot take this type.", [
+    "Specialty: Larceny (Lockpicking) or Streetwise (Black Market)",
+    "Gain one dot of Blood Sorcery (Tremere/Banu Haqim), Oblivion (Hecata), or Obfuscate",
+    "Gain the Iron Gullet merit (•••)",
+    "Gain an Enemy flaw (••)",
+  ], "Core"),
   predator("Blood Leech", "You feed on other Kindred, hunting your own kind for their potent Vitae.", [
-    "A dot of Celerity or Protean",
-    "Raised Blood Potency, offset by the Prey Exclusion (mortals) flaw",
-    "The enmity that comes with feeding on the Damned",
-  ]),
+    "Specialty: Brawl (Kindred) or Stealth (against Kindred)",
+    "Gain one dot of Celerity or Protean",
+    "Lose one dot of Humanity; raise Blood Potency by one",
+    "Gain Diablerist (••) or Shunned (••), plus Prey Exclusion (mortals) (••)",
+  ], "Core"),
   predator("Cleaver", "You feed quietly on your own mortal family or household, keeping them close and unaware.", [
-    "A dot of Dominate or Animalism",
-    "The Cleaver flaw — a mortal family you cannot abandon",
-    "A herd rooted in your domestic life",
-  ]),
+    "Specialty: Persuasion (Gaslighting) or Subterfuge (Coverups)",
+    "Gain one dot of Dominate or Animalism",
+    "Gain the Dark Secret: Cleaver flaw (•)",
+    "Gain the Herd advantage (••)",
+  ], "Core"),
   predator("Consensualist", "You feed only from the willing, taking blood as a gift with consent given freely.", [
-    "A dot of Auspex or Fortitude",
-    "A specialty in Medicine or Persuasion",
-    "The Dark Secret of breaking the Masquerade to gain consent",
-  ]),
-  predator("Farmer", "You refuse human blood and feed on animals, clinging to the last of your humanity.", [
-    "A dot of Animalism or Protean",
-    "The Farmer flaw — you cannot easily feed on humans",
-    "A specialty in Animal Ken",
-  ]),
+    "Specialty: Medicine (Phlebotomy) or Persuasion (Vessels)",
+    "Gain one dot of Auspex or Fortitude",
+    "Gain one dot of Humanity",
+    "Gain Masquerade Breacher (•) and Prey Exclusion (non-consenting) (•)",
+  ], "Core"),
+  predator("Farmer", "You refuse human blood and feed on animals, clinging to the last of your humanity. Ventrue cannot take this type, nor characters at Blood Potency 3+.", [
+    "Specialty: Animal Ken (specific animal) or Survival (Hunting)",
+    "Gain one dot of Animalism or Protean",
+    "Gain one dot of Humanity",
+    "Gain the Farmer feeding flaw (••)",
+  ], "Core"),
   predator("Osiris", "You are worshipped by a mortal following that offers you their blood in devotion.", [
-    "A dot of Blood Sorcery or Presence",
-    "A herd and a measure of Fame drawn from your flock",
-    "The complications of a cult that depends on you",
-  ]),
+    "Specialty: Occult (tradition) or Performance (field)",
+    "Gain one dot of Blood Sorcery (Tremere/Banu Haqim) or Presence",
+    "Spend three dots between Fame and Herd",
+    "Spend two dots between Enemies and Mythic flaws",
+  ], "Core"),
   predator("Sandman", "You feed on sleepers, slipping into homes to take blood from the unconscious.", [
-    "A dot of Auspex or Obfuscate",
-    "A specialty in Stealth",
-    "A haven and resources from careful, quiet work",
-  ]),
+    "Specialty: Medicine (Anesthetics) or Stealth (Break-in)",
+    "Gain one dot of Auspex or Obfuscate",
+    "Gain one dot of Resources",
+  ], "Core"),
   predator("Scene Queen", "You feed within a subculture or nightlife scene where you are known and adored.", [
-    "A dot of Dominate or Presence",
-    "Fame and Contacts within your scene",
-    "A specialty in a fitting Social skill, and a rival or two",
-  ]),
+    "Specialty: Etiquette, Leadership, or Streetwise (a specific scene)",
+    "Gain one dot of Dominate or Potence",
+    "Gain Fame (•) and a Contact (•)",
+    "Gain Disliked (•) or Prey Exclusion (a rival scene) (•)",
+  ], "Core"),
   predator("Siren", "You feed through seduction, taking blood in the guise of intimacy and desire.", [
-    "A dot of Fortitude or Presence",
-    "The Beautiful merit",
-    "A specialty in Persuasion (Seduction), and a jealous ex or enemy",
-  ]),
-  predator("Extortionist", "You take blood as payment, strong-arming victims who owe you protection or favors.", [
-    "A dot of Dominate or Potence",
-    "Contacts among police or criminals",
-    "A specialty in Intimidation or Larceny",
-  ]),
-  predator("Graverobber", "You feed on the freshly dead and the grieving, working amid corpses and cemeteries.", [
-    "A dot of Fortitude or Oblivion",
-    "The Iron Gullet merit and a haven near the dead",
-    "Ties to a morgue, hospital, or funeral trade",
-  ]),
-  predator("Roadside Killer", "You hunt travelers and the transient, taking those far from home who won't be traced to you.", [
-    "A dot of Fortitude or Protean",
-    "A specialty in Survival",
-    "Herd represented by a hunting territory rather than fixed prey",
-  ]),
-  predator("Grim Reaper", "You feed on the dying and the terminally ill, easing them toward an end that comes anyway.", [
-    "A dot of Auspex or Oblivion",
-    "A specialty in Medicine (Terminal Patients) or Awareness",
-    "Access to hospices, hospitals, or care homes",
-  ]),
-  predator("Montero", "You direct servants to drive prey to you, hunting in the old aristocratic style.", [
-    "A dot of Dominate or Obfuscate",
-    "Retainers who flush out and corner your quarry",
-    "A specialty in Leadership or Stealth",
-  ]),
-  predator("Pursuer", "You stalk a chosen victim for days, learning them intimately before you strike.", [
-    "A dot of Animalism or Auspex",
-    "A specialty in Investigation (Profiling)",
-    "The Bloodhound merit and contacts among the overlooked",
-  ]),
-  predator("Trapdoor", "You lure prey into a lair you control, feeding on those who enter your web.", [
-    "A dot of Obfuscate or Protean",
-    "A Haven with trap-like features",
-    "A specialty in Stealth or Persuasion",
-  ]),
+    "Specialty: Persuasion (Seduction) or Subterfuge (Seduction)",
+    "Gain one dot of Fortitude or Presence",
+    "Gain the Beautiful merit (••)",
+    "Gain an Enemy flaw (•) — a spurned lover or jealous partner",
+  ], "Core"),
+  predator("Extortionist", "You acquire blood in exchange for protection, security, or surveillance — genuine or fabricated.", [
+    "Specialty: Intimidation (Coercion) or Larceny (Security)",
+    "Gain one dot of Dominate or Potence",
+    "Spend three dots between Contacts and Resources",
+    "Gain an Enemy flaw (••)",
+  ], "Cults of the Blood Gods"),
+  predator("Graverobber", "You feed on the freshly dead and the grieving, working amid corpses, morgues, and cemeteries.", [
+    "Specialty: Occult (Grave Rituals) or Medicine (Cadavers)",
+    "Gain one dot of Fortitude or Oblivion",
+    "Gain the Iron Gullet merit (•••) and a Haven (•)",
+    "Gain the Obvious Predator herd flaw (••)",
+  ], "Cults of the Blood Gods"),
+  predator("Roadside Killer", "You never stay in one place, hunting travelers and the transient who won't be missed.", [
+    "Specialty: Survival (the road) or Investigation (vampire cant)",
+    "Gain one dot of Fortitude or Protean",
+    "Gain two dots of migrating Herd",
+    "Gain the Prey Exclusion (locals) flaw",
+  ], "Let the Streets Run Red"),
+  predator("Grim Reaper", "You feed on the dying in hospices, care homes, and hospitals, easing them toward an inevitable end.", [
+    "Specialty: Awareness (Death) or Larceny (Forgery)",
+    "Gain one dot of Auspex or Oblivion",
+    "Gain one dot of Allies or Influence in the medical community",
+    "Gain one dot of Humanity; gain Prey Exclusion (healthy mortals) (•)",
+  ], "Players Guide"),
+  predator("Montero", "You direct trained servants to drive prey toward you, hunting in the old aristocratic style.", [
+    "Specialty: Leadership (Hunting Pack) or Stealth (Stakeout)",
+    "Gain one dot of Dominate or Obfuscate",
+    "Gain two dots of Retainers",
+    "Lose one dot of Humanity",
+  ], "Players Guide"),
+  predator("Pursuer", "You stalk a chosen victim for days, learning their habits before you strike at the perfect moment.", [
+    "Specialty: Investigation (Profiling) or Stealth (Shadowing)",
+    "Gain one dot of Animalism or Auspex",
+    "Gain the Bloodhound merit (•) and a dot of Contacts",
+    "Lose one dot of Humanity",
+  ], "Players Guide"),
+  predator("Trapdoor", "You build a nest and lure prey inside, feeding on those who enter your web.", [
+    "Specialty: Persuasion (Marketing) or Stealth (Ambushes/Traps)",
+    "Gain one dot of Protean or Obfuscate",
+    "Gain a Haven (•) plus a dot of Retainers, Herd, or a second Haven dot",
+    "Gain the Creepy (•) or Haunted (•) haven flaw",
+  ], "Players Guide"),
+  predator("Tithe Collector", "Other Kindred pay you tribute in specially selected vessels, delivered on schedule or on request.", [
+    "Specialty: Intimidation (Kindred) or Leadership (Kindred)",
+    "Gain one dot of Dominate or Presence",
+    "Gain three dots of Domain or Status",
+    "Gain an Adversary flaw (••)",
+  ], "In Memoriam"),
 ];
 
 export default [...clans, ...predators];
