@@ -31,6 +31,7 @@ export class SheetState {
   name = $state("");
   img = $state("");
   system = $state<any>({});
+  flags = $state<any>({});
   items = $state<ItemSnapshot[]>([]);
   effects = $state<EffectSnapshot[]>([]);
   /** Bumped on every sync so components can force-depend on freshness. */
@@ -44,6 +45,7 @@ export class SheetState {
     this.name = doc.name;
     this.img = doc.img;
     this.system = foundry.utils.deepClone(doc.system);
+    this.flags = foundry.utils.deepClone(doc.flags ?? {});
     this.items = doc.items
       ? [...doc.items]
           .map((i: any) => ({

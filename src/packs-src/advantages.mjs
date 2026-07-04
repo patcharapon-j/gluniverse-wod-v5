@@ -156,6 +156,7 @@ export default [
   flaw("Resonance Sensitivity", 1, 1, "One Resonance triggers a unique compulsion in you.", "Players Guide"),
   flaw("Resonance Mimic", 2, 2, "A victim's memories bleed into you, penalizing you afterward.", "Players Guide"),
   flaw("Sloppy Feeder", 2, 2, "Your feeding leaves a telltale pattern that links your attacks.", "Players Guide"),
+  flaw("Obvious Predator", 2, 2, "A predatory aura costs dice on hunting and calming pools; you cannot keep a Herd.", "Core"),
 
   /* ===================================================================== *
    * MERITS & FLAWS — MYTHIC                                               *
