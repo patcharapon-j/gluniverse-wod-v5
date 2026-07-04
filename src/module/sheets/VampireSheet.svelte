@@ -1,6 +1,13 @@
 <script lang="ts">
   import { CLANS, PREDATOR_TYPES, RESONANCES, RESONANCE_INTENSITIES, BLOOD_POTENCY } from "../config.ts";
-  import { prettify } from "../components/labels.ts";
+  import { prettify, label } from "../components/labels.ts";
+  import {
+    HUMANITY_INFO,
+    bloodPotencyInfo,
+    RESONANCE_INFO,
+    RESONANCE_INTENSITY_INFO,
+    resonanceDieBonus,
+  } from "../vtm/lore.ts";
   import DotRating from "../components/DotRating.svelte";
   import DamageTrack from "../components/DamageTrack.svelte";
   import AttributeGrid from "../components/AttributeGrid.svelte";
@@ -52,11 +59,22 @@
   const bane = $derived(sys.clan ? clanBane(sys.clan) : "");
   const compulsion = $derived(sys.clan ? clanCompulsion(sys.clan) : "");
 
+  // What the current state levels entail, for the expandable readouts.
+  const humanityInfo = $derived(HUMANITY_INFO[Math.max(0, Math.min(10, sys.humanity?.value ?? 0))]!);
+  const bpInfo = $derived(bloodPotencyInfo(sys.bloodPotency ?? 0));
+  const resoInfo = $derived(sys.resonance?.type ? RESONANCE_INFO[sys.resonance.type as keyof typeof RESONANCE_INFO] : null);
+  const resoIntensity = $derived(
+    sys.resonance?.intensity ? RESONANCE_INTENSITY_INFO[sys.resonance.intensity] : null,
+  );
+  const resoBonus = $derived(resonanceDieBonus(sys.resonance));
+
   // --- local UI state -------------------------------------------------------
   let collapsed: Record<string, boolean> = $state({});
   let expanded: Record<string, boolean> = $state({});
   let editMode = $state(false);
   let dragOver = $state(false);
+  let showHumanityInfo = $state(false);
+  let showBpInfo = $state(false);
 
   const toggle = (key: string) => (collapsed[key] = !collapsed[key]);
   const reveal = (key: string) => (expanded[key] = !expanded[key]);
@@ -252,6 +270,16 @@
               onkeydown={(e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), setHumanity(i))}></span>
           {/each}
         </div>
+        <button class="lvl-readout" onclick={() => (showHumanityInfo = !showHumanityInfo)} aria-expanded={showHumanityInfo}>
+          <span class="lvl-num">{sys.humanity.value}</span>
+          <span class="lvl-blurb">{humanityInfo.blurb}</span>
+          <span class="lvl-caret" class:open={showHumanityInfo}>▸</span>
+        </button>
+        {#if showHumanityInfo}
+          <ul class="lvl-effects">
+            {#each humanityInfo.effects as e (e)}<li>{e}</li>{/each}
+          </ul>
+        {/if}
       </div>
 
       <div class="rail-div"></div>
@@ -261,20 +289,43 @@
           <span class="l">Blood Potency</span>
           <DotRating value={sys.bloodPotency} max={10} size={11} color="blood" readonly={!editMode} onchange={(n) => up("system.bloodPotency", n)} />
         </div>
+        <button class="lvl-readout" onclick={() => (showBpInfo = !showBpInfo)} aria-expanded={showBpInfo}>
+          <span class="lvl-num">{sys.bloodPotency ?? 0}</span>
+          <span class="lvl-blurb">{bpInfo.blurb}</span>
+          <span class="lvl-caret" class:open={showBpInfo}>▸</span>
+        </button>
+        {#if showBpInfo}
+          <ul class="lvl-effects">
+            {#each bpInfo.effects as e (e)}<li>{e}</li>{/each}
+          </ul>
+        {/if}
+
         <div class="reso">
           <span class="mini-lbl">Resonance</span>
-          <select class="reso-sel" value={sys.resonance?.type ?? ""} disabled={!editMode} onchange={(e) => up("system.resonance.type", e.currentTarget.value)}>
+          <select class="reso-sel" value={sys.resonance?.type ?? ""} onchange={(e) => up("system.resonance.type", e.currentTarget.value)}>
             <option value="">—</option>
             {#each RESONANCES as r (r)}<option value={r}>{prettify(r)}</option>{/each}
           </select>
         </div>
         <div class="reso">
           <span class="mini-lbl">Intensity</span>
-          <select class="reso-sel" value={sys.resonance?.intensity ?? ""} disabled={!editMode} onchange={(e) => up("system.resonance.intensity", e.currentTarget.value)}>
+          <select class="reso-sel" value={sys.resonance?.intensity ?? ""} onchange={(e) => up("system.resonance.intensity", e.currentTarget.value)}>
             <option value="">—</option>
             {#each RESONANCE_INTENSITIES as r (r)}<option value={r}>{prettify(r)}</option>{/each}
           </select>
         </div>
+        {#if resoInfo}
+          <div class="reso-info">
+            <div class="reso-discs">
+              {#if resoBonus.dice > 0}
+                <span class="reso-bonus">+{resoBonus.dice}</span>
+              {/if}
+              <span class="reso-disc-names">{resoInfo.disciplines.map((d) => label("Disciplines", d)).join(" · ")}</span>
+            </div>
+            {#if resoIntensity}<p class="reso-note">{resoIntensity.blurb}</p>{/if}
+            <p class="reso-emote">{resoInfo.emotions}</p>
+          </div>
+        {/if}
       </div>
     </aside>
   </div>
@@ -975,6 +1026,110 @@
     font-weight: 600;
     font-size: 15px;
     text-align: right;
+  }
+
+  /* Expandable "what this level means" readout, shared by Humanity and Blood
+     Potency. Collapsed it shows the rating + a one-line blurb; open it lists
+     the mechanical effects. */
+  .lvl-readout {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    width: 100%;
+    margin-top: 8px;
+    padding: 4px 2px;
+    background: transparent;
+    border: none;
+    border-top: 1px dotted var(--gl-line-soft);
+    cursor: pointer;
+    text-align: left;
+  }
+  .lvl-num {
+    font-family: var(--gl-serif);
+    font-weight: 700;
+    font-size: 16px;
+    color: var(--gl-blood);
+    line-height: 1;
+    flex: none;
+  }
+  .lvl-blurb {
+    flex: 1;
+    font-size: 11.5px;
+    font-style: italic;
+    color: var(--gl-muted-2);
+    line-height: 1.3;
+  }
+  .lvl-caret {
+    flex: none;
+    font-size: 10px;
+    color: var(--gl-muted);
+    transition: transform 0.12s;
+    transform: rotate(0deg);
+  }
+  .lvl-caret.open {
+    transform: rotate(90deg);
+  }
+  .lvl-effects {
+    list-style: none;
+    margin: 2px 0 6px;
+    padding: 0;
+  }
+  .lvl-effects li {
+    position: relative;
+    padding: 3px 0 3px 14px;
+    font-size: 11.5px;
+    line-height: 1.35;
+    color: var(--gl-ink);
+    border-bottom: 1px dotted var(--gl-line-soft);
+  }
+  .lvl-effects li:last-child {
+    border-bottom: none;
+  }
+  .lvl-effects li::before {
+    content: "";
+    position: absolute;
+    left: 3px;
+    top: 9px;
+    width: 4px;
+    height: 4px;
+    transform: rotate(45deg);
+    background: var(--gl-blood);
+  }
+  .reso-info {
+    margin-top: 6px;
+    padding-top: 6px;
+    border-top: 1px dotted var(--gl-line-soft);
+  }
+  .reso-discs {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 3px;
+  }
+  .reso-bonus {
+    font-family: var(--gl-serif);
+    font-weight: 700;
+    font-size: 13px;
+    color: var(--gl-gold, #c8a86b);
+  }
+  .reso-disc-names {
+    font-family: var(--gl-semi);
+    font-weight: 600;
+    font-size: 12px;
+    color: var(--gl-ink);
+  }
+  .reso-note {
+    margin: 0 0 3px;
+    font-size: 11px;
+    color: var(--gl-muted-2);
+    line-height: 1.3;
+  }
+  .reso-emote {
+    margin: 0;
+    font-size: 11px;
+    font-style: italic;
+    color: var(--gl-muted);
+    line-height: 1.3;
   }
 
   /* panels */

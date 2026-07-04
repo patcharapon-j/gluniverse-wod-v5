@@ -20,6 +20,12 @@ export interface RollSeed {
   skill?: string;
   /** Preselect a Discipline (by key) to add the actor's dots to the pool. */
   discipline?: string;
+  /**
+   * A Discipline (by key) that the roll *uses* but whose dots are already baked
+   * into `fixedPool` — drives the Resonance die bonus without double-counting
+   * dots. Set for power rolls that resolve their own written pool.
+   */
+  resonanceFor?: string;
   flavor?: string;
   difficulty?: number;
   /** A pre-resolved base pool (e.g. a power's dice pool), added before pickers. */
@@ -112,7 +118,12 @@ export function rollPower(actor: any, power: any): void {
   const poolStr: string = power?.system?.pool ?? "";
   if (poolStr) {
     const { total } = resolvePool(actor, poolStr);
-    openRollDialog(actor, { fixedPool: total, poolLabel: poolStr, flavor: power.name });
+    openRollDialog(actor, {
+      fixedPool: total,
+      poolLabel: poolStr,
+      flavor: power.name,
+      resonanceFor: power?.system?.discipline,
+    });
   } else {
     // No written pool: seed the power's Discipline so its dots are added.
     openRollDialog(actor, { discipline: power?.system?.discipline, flavor: power.name });
