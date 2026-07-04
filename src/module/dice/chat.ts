@@ -57,7 +57,9 @@ function dieChip(value: number, hunger: boolean, rerolled = false, index?: numbe
   // click-to-select; Hunger dice may never be re-rolled (V5 core).
   const data =
     index !== undefined && !hunger ? ` data-die-index="${index}"` : "";
-  return `<span class="${cls.join(" ")}" title="${title}"${data}>${body}</span>`;
+  // `--gl-i` staggers the entrance animation (see gluniverse-wod.css).
+  const stagger = index !== undefined ? ` style="--gl-i:${index}"` : "";
+  return `<span class="${cls.join(" ")}" title="${title}"${data}${stagger}>${body}</span>`;
 }
 
 function diceRow(result: V5RollResult): string {
@@ -212,7 +214,7 @@ export interface CheckCardData {
 
 /** Post a single-purpose check (Rouse / Remorse / Frenzy) card. */
 export async function postCheckCard(actor: any, data: CheckCardData): Promise<void> {
-  const chips = data.dice.map((v) => dieChip(v, data.kind === "rouse", false)).join("");
+  const chips = data.dice.map((v, i) => dieChip(v, data.kind === "rouse", false, i)).join("");
   const diceTooltip = await renderDiceTooltip(data.roll);
   const img = data.img ?? actor?.img;
   const portrait = img

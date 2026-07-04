@@ -58,12 +58,14 @@
     background: transparent;
     box-sizing: border-box;
     user-select: none;
+    transition: background 0.18s ease, border-color 0.12s ease;
   }
   /* Damage strokes span the whole box, matching the Humanity stain cross:
-     one diagonal for superficial, two crossed for aggravated. */
-  .box.sup::before,
-  .box.agg::before,
-  .box.agg::after {
+     one diagonal for superficial, two crossed for aggravated. Both strokes are
+     always present but collapsed, so marking damage draws them in like a knife
+     stroke; the aggravated cross-stroke lands a beat after the first. */
+  .box::before,
+  .box::after {
     content: "";
     position: absolute;
     top: 50%;
@@ -71,19 +73,27 @@
     width: 2px;
     height: 130%;
     background: var(--gl-blood-bright);
+    transition: transform 0.18s ease-out;
+  }
+  .box::before {
+    transform: translate(-50%, -50%) rotate(45deg) scaleY(0);
+  }
+  .box::after {
+    transform: translate(-50%, -50%) rotate(-45deg) scaleY(0);
   }
   .box.sup::before,
   .box.agg::before {
-    transform: translate(-50%, -50%) rotate(45deg);
+    transform: translate(-50%, -50%) rotate(45deg) scaleY(1);
   }
   .box.agg::after {
-    transform: translate(-50%, -50%) rotate(-45deg);
+    transform: translate(-50%, -50%) rotate(-45deg) scaleY(1);
+    transition-delay: 0.07s;
   }
   .box.agg {
     background: #e3d3bd;
   }
   .box:hover {
-    filter: brightness(0.96);
+    border-color: var(--gl-blood);
   }
   .box:focus-visible {
     outline: 2px solid var(--gl-blood);

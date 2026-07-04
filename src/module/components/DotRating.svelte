@@ -51,6 +51,7 @@
     display: inline-block;
     position: relative;
     box-sizing: border-box;
+    transition: transform 0.12s ease, border-color 0.12s ease;
   }
   .dots.blood .dot {
     border-color: var(--gl-blood);
@@ -58,18 +59,28 @@
   .dot.readonly {
     cursor: default;
   }
-  .dot.on::after {
+  /* The fill is always present and scales in/out, so rating changes read as a
+     small bloom instead of an instant repaint. */
+  .dot::after {
     content: "";
     position: absolute;
     inset: 2px;
     border-radius: 50%;
     background: var(--gl-ink);
+    transform: scale(0);
+    opacity: 0;
+    transition: transform 0.16s cubic-bezier(0.2, 0.8, 0.3, 1.2), opacity 0.12s ease;
   }
-  .dots.blood .dot.on::after {
+  .dot.on::after {
+    transform: scale(1);
+    opacity: 1;
+  }
+  .dots.blood .dot::after {
     background: var(--gl-blood);
   }
   .dot:not(.readonly):hover {
-    filter: brightness(0.9);
+    transform: scale(1.15);
+    border-color: var(--gl-blood);
   }
   .dot:focus-visible {
     outline: 2px solid var(--gl-blood);

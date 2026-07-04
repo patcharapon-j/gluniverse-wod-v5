@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { scale } from "svelte/transition";
+  import { pulse } from "../apps/anim.ts";
   import { ATTRIBUTE_KEYS, SKILL_KEYS } from "../config.ts";
   import { label, prettify } from "../components/labels.ts";
   import { disciplineRating } from "../dice/pool.ts";
@@ -177,7 +179,7 @@
 
   <div class="preview">
     <div class="pv-pool">
-      <span class="pv-num">{totalPool}</span>
+      <span class="pv-num" use:pulse={totalPool}>{totalPool}</span>
       <span class="pv-lbl">dice</span>
     </div>
     <div class="pv-break">
@@ -200,10 +202,10 @@
   {#if totalPool > 0}
     <div class="dice-tray" aria-hidden="true">
       {#each Array.from({ length: normalDice }, (_, i) => i) as i (`n${i}`)}
-        <span class="die"></span>
+        <span class="die" transition:scale={{ duration: 140, start: 0.4 }}></span>
       {/each}
       {#each Array.from({ length: hungerDice }, (_, i) => i) as i (`h${i}`)}
-        <span class="die hunger"></span>
+        <span class="die hunger" transition:scale={{ duration: 140, start: 0.4 }}></span>
       {/each}
     </div>
   {/if}
@@ -349,6 +351,7 @@
     border-radius: 3px;
     padding: 2px 8px;
     cursor: pointer;
+    transition: border-color 0.12s ease, background-color 0.12s ease, color 0.12s ease;
   }
   .spec-chip.on {
     border-color: var(--gl-blood);
