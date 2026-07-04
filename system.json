@@ -109,8 +109,29 @@
       ]
     }
   ],
-  "gridDistance": 1,
-  "gridUnits": "m",
+  "documentTypes": {
+    "Actor": {
+      "vampire": {},
+      "mortal": {},
+      "ghoul": {},
+      "spc": {},
+      "coterie": {}
+    },
+    "Item": {
+      "discipline": {},
+      "power": {},
+      "ritual": {},
+      "ceremony": {},
+      "advantage": {},
+      "weapon": {},
+      "armor": {},
+      "gear": {}
+    }
+  },
+  "grid": {
+    "distance": 1,
+    "units": "m"
+  },
   "primaryTokenAttribute": "health",
   "secondaryTokenAttribute": "willpower",
   "url": "https://github.com/patcharapon-j/gluniverse-wod-v5",

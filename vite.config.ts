@@ -8,7 +8,6 @@ import { viteStaticCopy } from "vite-plugin-static-copy";
  *
  *   dist/
  *   ├── system.json
- *   ├── template.json
  *   ├── module/gluniverse-wod.js
  *   ├── styles/gluniverse-wod.css
  *   ├── styles/fonts/*.woff2
@@ -46,7 +45,6 @@ export default defineConfig({
     viteStaticCopy({
       targets: [
         { src: "system.json", dest: "." },
-        { src: "template.json", dest: "." },
         { src: "lang", dest: "." },
         { src: "styles", dest: "." },
       ],

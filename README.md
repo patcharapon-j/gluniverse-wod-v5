@@ -37,7 +37,6 @@ The build assembles a Foundry-ready package in `dist/`:
 ```
 dist/
 ├── system.json
-├── template.json
 ├── module/gluniverse-wod.js
 ├── styles/gluniverse-wod.css
 └── lang/en.json

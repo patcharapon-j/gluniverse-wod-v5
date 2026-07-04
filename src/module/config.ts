@@ -157,7 +157,7 @@ export const BLOOD_POTENCY = [
   { surge: 6, mend: 5, powerBonus: 5, rouseReroll: 5, bane: 6 }, // 10
 ] as const;
 
-/** Actor and Item subtypes, mirrored in template.json. */
+/** Actor and Item subtypes, mirrored in system.json `documentTypes`. */
 export const ACTOR_TYPES = ["vampire", "mortal", "ghoul", "spc", "coterie"] as const;
 export const ITEM_TYPES = [
   "discipline",

@@ -5,8 +5,10 @@ Hunter, Werewolf, etc.), built as one shared system covering every V5 splat.
 
 ## Layout
 
-- `system.json` — Foundry manifest (id, version, compatibility, manifest/download URLs).
-- `template.json` — Actor/Item data models (mortal, vampire, hunter; skill, power, advantage).
+- `system.json` — Foundry manifest (id, version, compatibility, manifest/download
+  URLs, and `documentTypes` declaring Actor/Item subtypes).
+- `src/module/data/` — DataModels for each subtype, registered onto `CONFIG` in
+  `init` (replaces the removed `template.json` schema declarations).
 - `src/module/gluniverse-wod.ts` — system entry point (Foundry `init`/`ready` hooks).
 - `src/foundry-shim.d.ts` — minimal ambient types; replace with `foundry-vtt-types` when implementing.
 - `styles/`, `lang/` — CSS and localization, copied into the build as-is.
@@ -20,7 +22,7 @@ Hunter, Werewolf, etc.), built as one shared system covering every V5 splat.
 
 ## Build
 
-`vite build` compiles `src/` and copies `system.json`, `template.json`, `lang/`,
+`vite build` compiles `src/` and copies `system.json`, `lang/`,
 `styles/` into `dist/`; then `npm run build:packs` compiles the compendium
 content into `dist/packs/`. `npm run build` runs both. `dist/` is the root of the
 packaged `system.zip`.
