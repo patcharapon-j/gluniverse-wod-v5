@@ -447,19 +447,37 @@
     gap: 6px;
     margin-bottom: 14px;
   }
+  /* Normal dice are frosted glass — translucent, blurred, catching light — so
+     the pool reads as cool and inert against the blood-red Hunger stones. */
   .die {
     width: 22px;
     height: 22px;
-    border-radius: 5px;
+    border-radius: 6px;
     flex: none;
     box-sizing: border-box;
     position: relative;
-    background: linear-gradient(155deg, #3a3a3e, #131315);
-    border: 1px solid #000;
+    overflow: hidden;
+    background:
+      linear-gradient(155deg, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0.12));
+    backdrop-filter: blur(6px) saturate(130%);
+    -webkit-backdrop-filter: blur(6px) saturate(130%);
+    border: 1px solid rgba(255, 255, 255, 0.6);
     box-shadow:
-      inset 0 1px 1px rgba(255, 255, 255, 0.14),
-      inset 0 -2px 3px rgba(0, 0, 0, 0.5),
-      0 1px 2px rgba(0, 0, 0, 0.4);
+      inset 0 1px 1px rgba(255, 255, 255, 0.75),
+      inset 0 -3px 6px rgba(40, 20, 25, 0.1),
+      0 1px 3px rgba(20, 10, 12, 0.18);
+  }
+  /* A slanted glare streak sells the glass. */
+  .die::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      125deg,
+      rgba(255, 255, 255, 0.5) 0%,
+      rgba(255, 255, 255, 0) 42%
+    );
+    pointer-events: none;
   }
   /* A small centred pip evokes a d10 face without drawing a whole die. */
   .die::after {
@@ -470,7 +488,7 @@
     width: 5px;
     height: 5px;
     transform: translate(-50%, -50%) rotate(45deg);
-    background: rgba(255, 255, 255, 0.28);
+    background: rgba(60, 38, 42, 0.4);
     border-radius: 1px;
   }
   .die.hunger {
