@@ -15,6 +15,7 @@ export const SETTINGS = {
   automateRemorse: "automateRemorse",
   defaultDifficulty: "defaultDifficulty",
   gmHud: "gmHud",
+  colorScheme: "colorScheme",
   // Character-creation budgets (world scope, soft limits used by the builder).
   creationAttributes: "creationAttributes",
   creationSkillsJack: "creationSkillsJack",
@@ -51,8 +52,34 @@ export function getSetting<T = unknown>(key: SettingKey, fallback: T): T {
   }
 }
 
+/**
+ * Stamp the chosen colour scheme onto <body>. The dark palette in
+ * gluniverse-wod.css keys off these classes; "auto" stamps nothing and lets
+ * Foundry's own theme-dark class (or prefers-color-scheme) decide.
+ */
+export function applyColorScheme(): void {
+  const scheme = getSetting<string>(SETTINGS.colorScheme, "auto");
+  document.body.classList.toggle("gl-scheme-dark", scheme === "dark");
+  document.body.classList.toggle("gl-scheme-light", scheme === "light");
+}
+
 export function registerSettings(): void {
   const settings = (game as any).settings;
+
+  settings.register(SYSTEM_ID, SETTINGS.colorScheme, {
+    name: "GLUNIVERSE.Settings.ColorScheme.Name",
+    hint: "GLUNIVERSE.Settings.ColorScheme.Hint",
+    scope: "client",
+    config: true,
+    type: String,
+    choices: {
+      auto: "GLUNIVERSE.Settings.ColorScheme.Auto",
+      light: "GLUNIVERSE.Settings.ColorScheme.Light",
+      dark: "GLUNIVERSE.Settings.ColorScheme.Dark",
+    },
+    default: "auto",
+    onChange: () => applyColorScheme(),
+  });
 
   settings.register(SYSTEM_ID, SETTINGS.automateHunger, {
     name: "GLUNIVERSE.Settings.AutomateHunger.Name",

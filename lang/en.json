@@ -130,6 +130,11 @@
   "GLUNIVERSE.Settings.AutomateRemorse.Hint": "Apply the Remorse result automatically — clear stains on success, lower Humanity on failure.",
   "GLUNIVERSE.Settings.DefaultDifficulty.Name": "Default roll difficulty",
   "GLUNIVERSE.Settings.DefaultDifficulty.Hint": "The difficulty the dice-pool dialog starts on when a roll doesn't specify one. 0 means no set difficulty: the chat card simply reports the number of successes.",
+  "GLUNIVERSE.Settings.ColorScheme.Name": "Colour scheme",
+  "GLUNIVERSE.Settings.ColorScheme.Hint": "Palette for the system's sheets, dialogs, and chat cards. Auto follows Foundry's own interface colour scheme.",
+  "GLUNIVERSE.Settings.ColorScheme.Auto": "Auto (match Foundry)",
+  "GLUNIVERSE.Settings.ColorScheme.Light": "Light parchment",
+  "GLUNIVERSE.Settings.ColorScheme.Dark": "Dark midnight",
   "GLUNIVERSE.Settings.GmHud.Name": "Storyteller dice HUD",
   "GLUNIVERSE.Settings.GmHud.Hint": "Show a floating quick dice-pool roller in the bottom-right corner for Game Masters.",
 

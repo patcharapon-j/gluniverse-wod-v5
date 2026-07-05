@@ -90,7 +90,7 @@
     transition-delay: 0.07s;
   }
   .box.agg {
-    background: #e3d3bd;
+    background: var(--gl-track-agg, #e3d3bd);
   }
   .box:hover {
     border-color: var(--gl-blood);
