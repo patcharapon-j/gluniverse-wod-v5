@@ -17,6 +17,8 @@ import { rouseCheck, remorseCheck } from "./dice/checks.ts";
 import { frenzyCheck } from "./dice/frenzy.ts";
 import { initGmHud } from "./apps/gm-hud.ts";
 import { registerDiceSoNice } from "./apps/dice-so-nice.ts";
+import { registerSystemSocket } from "./socket.ts";
+import { openRequestRollDialog } from "./apps/RequestRollApp.ts";
 
 Hooks.once("init", () => {
   console.log(`${SYSTEM_ID} | Initializing GLUniverse — World of Darkness V5`);
@@ -37,7 +39,9 @@ Hooks.once("ready", () => {
     rouseCheck,
     remorseCheck,
     frenzyCheck,
+    requestRoll: openRequestRollDialog,
   };
+  registerSystemSocket();
   initGmHud();
   applyColorScheme();
   console.log(`${SYSTEM_ID} | Ready (v${version})`);

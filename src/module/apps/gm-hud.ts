@@ -12,6 +12,7 @@ import GmHud from "./GmHud.svelte";
 import { rollPool } from "../dice/roll-v5.ts";
 import { postRollCard } from "../dice/chat.ts";
 import { getSetting, SETTINGS } from "../settings.ts";
+import { openRequestRollDialog } from "./RequestRollApp.ts";
 
 const HUD_ID = "gl-gm-hud";
 
@@ -37,7 +38,7 @@ export function initGmHud(): void {
   } as CSSStyleDeclaration);
   document.body.appendChild(host);
 
-  mount(GmHud, { target: host, props: { onroll: doRoll } });
+  mount(GmHud, { target: host, props: { onroll: doRoll, onrequest: openRequestRollDialog } });
 
   const findSidebar = (): HTMLElement | null =>
     (document.querySelector("#sidebar") ??

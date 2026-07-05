@@ -14,6 +14,9 @@ import { postRollCard, rollCardHTML } from "../dice/chat.ts";
 import { rouseCheck, bloodSurgeBonus } from "../dice/checks.ts";
 import { resolvePool } from "../dice/pool.ts";
 import { getSetting, SETTINGS } from "../settings.ts";
+import { routeRequestUpdate } from "../dice/request.ts";
+import type { RequestPoolSpec } from "../dice/request-types.ts";
+import { label } from "../components/labels.ts";
 
 export interface RollSeed {
   attribute?: string;
@@ -32,6 +35,14 @@ export interface RollSeed {
   fixedPool?: number;
   /** Human label for a pre-resolved base pool. */
   poolLabel?: string;
+  /** ChatMessage id of the request card this roll fulfils, if any. */
+  requestMessageId?: string;
+  /** When set, the difficulty is seeded read-only (Storyteller-controlled). */
+  lockDifficulty?: boolean;
+  /** Pre-seeded flat modifier (e.g. a request's flat pool modifier). */
+  modifier?: number;
+  /** The pool the request asked for, used to compute a deviation note. */
+  requestedPool?: RequestPoolSpec;
 }
 
 const AppV2 = foundry.applications.api.ApplicationV2;
@@ -83,7 +94,32 @@ export class RollDialogApp extends AppV2 {
       await rouseCheck(this._actor, { label: "Blood Surge — Rouse" });
     }
     const { result, roll } = await rollPool({ pool, hunger: o.hunger, difficulty: o.difficulty });
-    await postRollCard(this._actor, result, roll, { flavor: o.flavor, bloodSurge: o.bloodSurge });
+
+    const seed = this._seed;
+    const fromRequest = !!seed.requestMessageId;
+    // A request pins a specific attribute+skill; note when the player rolled
+    // something else. Discipline is an additive option, so it never deviates.
+    const deviation = computeDeviation(seed.requestedPool, o);
+
+    const message = await postRollCard(this._actor, result, roll, {
+      flavor: o.flavor,
+      bloodSurge: o.bloodSurge,
+      requestMessageId: seed.requestMessageId,
+      deviation,
+      forcePublic: fromRequest,
+    });
+
+    if (fromRequest) {
+      await routeRequestUpdate({
+        type: "requestFulfilled",
+        requestMessageId: seed.requestMessageId!,
+        actorUuid: this._actor.uuid,
+        result,
+        resultMessageId: message?.id,
+        deviation,
+      });
+    }
+
     await this.close();
   }
 
@@ -102,6 +138,36 @@ export interface RollDialogResult {
   difficulty: number;
   flavor: string;
   bloodSurge: boolean;
+  /** Chosen attribute key, for request pool-deviation detection. */
+  attribute?: string;
+  /** Chosen skill key, for request pool-deviation detection. */
+  skill?: string;
+  /** Chosen discipline key (additive option — never counts as deviation). */
+  discipline?: string;
+}
+
+/**
+ * Human note when the rolled attribute/skill differs from what the request
+ * asked for, e.g. "requested Wits + Awareness, rolled Wits + Intimidation".
+ * A discipline change is an additive option and does NOT count as deviation.
+ */
+function computeDeviation(
+  requested: RequestPoolSpec | undefined,
+  chosen: RollDialogResult,
+): string | undefined {
+  if (!requested) return undefined;
+  const reqAttr = requested.attribute ?? "";
+  const reqSkill = requested.skill ?? "";
+  const gotAttr = chosen.attribute ?? "";
+  const gotSkill = chosen.skill ?? "";
+  if (reqAttr === gotAttr && reqSkill === gotSkill) return undefined;
+
+  const fmt = (attr: string, skill: string): string =>
+    [attr && label("Attributes", attr), skill && label("Skills", skill)]
+      .filter(Boolean)
+      .join(" + ") || "—";
+
+  return `requested ${fmt(reqAttr, reqSkill)}, rolled ${fmt(gotAttr, gotSkill)}`;
 }
 
 /** Convenience: open the pool dialog for an actor, seeded from a clicked trait. */

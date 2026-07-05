@@ -4,8 +4,9 @@
      button; clicking it expands the full roll UI. */
   interface Props {
     onroll: (o: { pool: number; hunger: number; difficulty: number }) => void;
+    onrequest: () => void;
   }
-  let { onroll }: Props = $props();
+  let { onroll, onrequest }: Props = $props();
 
   let open = $state(false);
   let pool = $state(4);
@@ -62,6 +63,7 @@
         </div>
       </div>
       <button class="roll" onclick={go} disabled={pool === 0}>Roll {pool}d</button>
+      <button class="request" onclick={onrequest}>Request Roll…</button>
     </div>
   </div>
 {/if}
@@ -217,5 +219,20 @@
   .roll:disabled {
     opacity: 0.5;
     cursor: not-allowed;
+  }
+  .request {
+    font-family: var(--gl-cond);
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    font-size: 11px;
+    color: var(--gl-blood);
+    background: transparent;
+    border: 1px solid var(--gl-blood);
+    border-radius: 3px;
+    padding: 6px;
+    cursor: pointer;
+  }
+  .request:hover {
+    background: color-mix(in srgb, var(--gl-blood) 10%, transparent);
   }
 </style>

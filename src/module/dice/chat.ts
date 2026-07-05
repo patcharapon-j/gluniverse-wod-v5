@@ -80,6 +80,8 @@ export interface RollCardOptions {
   bloodSurge?: boolean;
   /** Extra italic note under the dice (e.g. the Willpower re-roll line). */
   note?: string;
+  /** Human note when the rolled pool deviated from a request's asked pool. */
+  deviation?: string;
 }
 
 /** Build the roll-card body (the message content Foundry wraps in its chrome). */
@@ -140,6 +142,8 @@ export function rollCardHTML(opts: RollCardOptions): string {
 
     ${opts.note ? `<div class="gl-card-detail">${esc(opts.note)}</div>` : ""}
 
+    ${opts.deviation ? `<div class="gl-card-detail"><em>⚠ ${esc(opts.deviation)}</em></div>` : ""}
+
     ${
       opts.diceTooltip
         ? `<details class="gl-card-breakdown"><summary>Dice</summary>${opts.diceTooltip}</details>`
@@ -170,8 +174,18 @@ export async function postRollCard(
   actor: any,
   result: V5RollResult,
   roll: any,
-  opts: { flavor?: string; bloodSurge?: boolean; note?: string } = {},
-): Promise<void> {
+  opts: {
+    flavor?: string;
+    bloodSurge?: boolean;
+    note?: string;
+    /** ChatMessage id of the request card this roll fulfils, if any. */
+    requestMessageId?: string;
+    /** Human note when the rolled pool deviated from the requested one. */
+    deviation?: string;
+    /** Force the card public regardless of the user's chat roll-mode. */
+    forcePublic?: boolean;
+  } = {},
+): Promise<any> {
   const flavor = opts.flavor ?? "Roll";
   const img = actor?.img;
   const diceTooltip = await renderDiceTooltip(roll);
@@ -183,8 +197,9 @@ export async function postRollCard(
     diceTooltip,
     bloodSurge: opts.bloodSurge,
     note: opts.note,
+    deviation: opts.deviation,
   });
-  await ChatMessage.create({
+  const data: Record<string, any> = {
     speaker: ChatMessage.getSpeaker({ actor }),
     content,
     rolls: [roll],
@@ -197,9 +212,20 @@ export async function postRollCard(
         img,
         flavor,
         bloodSurge: !!opts.bloodSurge,
+        requestMessageId: opts.requestMessageId,
+        deviation: opts.deviation,
       },
     },
-  });
+  };
+  // Request-driven rolls are always public: pin the roll-mode to publicroll and
+  // clear any whisper/blind so the user's private roll-mode can't hide the card.
+  if (opts.forcePublic) {
+    // The ambient shim doesn't declare CONST; the literal is stable across v13.
+    data.rollMode = (globalThis as any).CONST?.DICE_ROLL_MODES?.PUBLIC ?? "publicroll";
+    data.whisper = [];
+    data.blind = false;
+  }
+  return await ChatMessage.create(data);
 }
 
 export interface CheckCardData {

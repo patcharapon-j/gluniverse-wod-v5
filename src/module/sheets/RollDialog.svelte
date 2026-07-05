@@ -33,9 +33,15 @@
   let skill = $state(seed.skill ?? "");
   /* svelte-ignore state_referenced_locally */
   let discipline = $state(seed.discipline ?? "");
-  let modifier = $state(0);
+  /* svelte-ignore state_referenced_locally */
+  let modifier = $state(seed.modifier ?? 0);
   /* svelte-ignore state_referenced_locally */
   let difficulty = $state(seed.difficulty ?? 0);
+  // The Storyteller may pin the difficulty; the local input becomes read-only.
+  /* svelte-ignore state_referenced_locally */
+  const lockDifficulty = seed.lockDifficulty ?? false;
+  /* svelte-ignore state_referenced_locally */
+  const fromRequest = !!seed.requestMessageId;
   let hunger = $state(sys.hunger ?? 0);
   let bloodSurge = $state(false);
   let useResonance = $state(true);
@@ -91,11 +97,17 @@
   );
 
   function roll() {
-    onroll({ pool, hunger, difficulty, flavor, bloodSurge });
+    onroll({ pool, hunger, difficulty, flavor, bloodSurge, attribute, skill, discipline });
   }
 </script>
 
 <div class="gl-roll" class:surging={bloodSurge}>
+  {#if fromRequest}
+    <div class="basepool reqbanner">
+      <span class="bp-lbl">Storyteller request — {seed.flavor ?? "Dice Pool"}</span>
+    </div>
+  {/if}
+
   {#if seed.poolLabel}
     <div class="basepool">
       <span class="bp-lbl">{seed.poolLabel}</span>
@@ -160,8 +172,12 @@
       <input type="number" min="0" max="5" bind:value={hunger} />
     </label>
     <label class="knob">
-      <span>Difficulty <i>(0 = none)</i></span>
-      <input type="number" min="0" bind:value={difficulty} title="0 — no difficulty: the card just counts successes" />
+      <span>Difficulty <i>{lockDifficulty ? "(locked 🔒)" : "(0 = none)"}</i></span>
+      {#if lockDifficulty}
+        <input type="number" value={difficulty} readonly disabled title="Set by the Storyteller" />
+      {:else}
+        <input type="number" min="0" bind:value={difficulty} title="0 — no difficulty: the card just counts successes" />
+      {/if}
     </label>
   </div>
 
@@ -289,6 +305,15 @@
     font-family: var(--gl-semi);
     font-weight: 600;
     font-size: 13px;
+  }
+  /* Slim banner marking a Storyteller-requested roll. */
+  .reqbanner {
+    border-left-color: var(--gl-gold, #c8a86b);
+    background: color-mix(in srgb, var(--gl-gold, #c8a86b) 10%, var(--gl-parch-raise));
+  }
+  .reqbanner .bp-lbl {
+    color: var(--gl-gold, #c8a86b);
+    font-style: italic;
   }
   .bp-num {
     font-family: var(--gl-serif);
