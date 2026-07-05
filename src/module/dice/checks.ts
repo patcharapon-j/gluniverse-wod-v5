@@ -9,7 +9,7 @@
 
 import { BLOOD_POTENCY } from "../config.ts";
 import { getSetting, SETTINGS } from "../settings.ts";
-import { postCheckCard } from "./chat.ts";
+import { postCheckCard, waitForDiceAnimation } from "./chat.ts";
 
 /** One die, 6+ succeeds. Blood Potency can let low-level Rouse checks re-roll. */
 export async function rouseCheck(
@@ -24,12 +24,7 @@ export async function rouseCheck(
   const success = best >= 6;
 
   const automate = getSetting(SETTINGS.automateHunger, true);
-  if (!success && automate) {
-    const cur = actor.system.hunger ?? 0;
-    if (cur < 5) await actor.update({ "system.hunger": cur + 1 });
-  }
-
-  await postCheckCard(actor, {
+  const message = await postCheckCard(actor, {
     kind: "rouse",
     title: opts.label ?? "Rouse the Blood",
     success,
@@ -41,6 +36,14 @@ export async function rouseCheck(
         : "The Blood resists — raise Hunger by 1.",
     roll,
   });
+
+  // Raise Hunger only after the 3D dice settle: a tracker ticking up while
+  // they are still tumbling would spoil the result.
+  if (!success && automate) {
+    await waitForDiceAnimation(message);
+    const cur = actor.system.hunger ?? 0;
+    if (cur < 5) await actor.update({ "system.hunger": cur + 1 });
+  }
   return success;
 }
 
@@ -64,18 +67,7 @@ export async function remorseCheck(actor: any): Promise<boolean> {
   const success = dice.some((d) => d >= 6);
 
   const automate = getSetting(SETTINGS.automateRemorse, true);
-  if (automate) {
-    if (success) {
-      await actor.update({ "system.humanity.stains": 0 });
-    } else {
-      await actor.update({
-        "system.humanity.value": Math.max(0, humanity - 1),
-        "system.humanity.stains": 0,
-      });
-    }
-  }
-
-  await postCheckCard(actor, {
+  const message = await postCheckCard(actor, {
     kind: "remorse",
     title: "Remorse",
     success,
@@ -89,6 +81,20 @@ export async function remorseCheck(actor: any): Promise<boolean> {
         : "The Beast wins — lower Humanity by 1 and clear the stains.",
     roll,
   });
+
+  // Same spoiler guard as the Rouse check: hold the Humanity/stain changes
+  // until the 3D dice have landed.
+  if (automate) {
+    await waitForDiceAnimation(message);
+    if (success) {
+      await actor.update({ "system.humanity.stains": 0 });
+    } else {
+      await actor.update({
+        "system.humanity.value": Math.max(0, humanity - 1),
+        "system.humanity.stains": 0,
+      });
+    }
+  }
   return success;
 }
 

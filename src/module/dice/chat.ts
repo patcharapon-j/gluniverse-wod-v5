@@ -323,8 +323,23 @@ export interface CheckCardData {
   img?: string;
 }
 
+/**
+ * Resolve once Dice So Nice has finished animating a message's roll — or
+ * immediately when DSN is absent. Callers hold visible actor mutations on this
+ * so trackers (Hunger, Humanity) can't spoil a result mid-tumble.
+ */
+export async function waitForDiceAnimation(message: any): Promise<void> {
+  const dice3d = (game as any).dice3d;
+  if (!dice3d?.waitFor3DAnimationByMessageID || !message?.id) return;
+  try {
+    await dice3d.waitFor3DAnimationByMessageID(message.id);
+  } catch {
+    // Never let a hiccup in the animation strand the roll's bookkeeping.
+  }
+}
+
 /** Post a single-purpose check (Rouse / Remorse / Frenzy) card. */
-export async function postCheckCard(actor: any, data: CheckCardData): Promise<void> {
+export async function postCheckCard(actor: any, data: CheckCardData): Promise<any> {
   const chips = data.dice
     .map((v, i) => dieChip(v, data.kind === "rouse" ? "rouse" : "regular", false, i))
     .join("");
@@ -349,7 +364,7 @@ export async function postCheckCard(actor: any, data: CheckCardData): Promise<vo
     <div class="gl-card-detail">${esc(data.detail)}</div>
     ${diceTooltip ? `<details class="gl-card-breakdown"><summary>Dice</summary>${diceTooltip}</details>` : ""}
   </div>`;
-  await ChatMessage.create({
+  return await ChatMessage.create({
     speaker: ChatMessage.getSpeaker({ actor }),
     content,
     rolls: [data.roll],
