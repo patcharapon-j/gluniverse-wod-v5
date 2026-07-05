@@ -111,7 +111,7 @@ export function registerDiceSoNice(): void {
         material: "plastic",
         font: "Oswald",
         emissive: "#ff2222",
-        emissiveIntensity: 0.12,
+        emissiveIntensity: 0.06,
       });
 
       // Rouse: the Hunger palette inverted — bone die, blood glyphs — so the
