@@ -26,6 +26,7 @@
   --gl-gold: #b8860b;
   --gl-good: #3f6b3a;
   --gl-rouse-bg: #f3d9d9;
+  --gl-track-agg: #e3d3bd;
 
   /* ---- type ---- */
   --gl-serif: "Cormorant Garamond", Georgia, serif;
@@ -37,6 +38,61 @@
   --gl-dot: 14px;
   --gl-dot-sm: 11px;
   --gl-box: 22px;
+}
+
+/* ------------------------------------------------------------------ *
+ * Dark palette ("midnight"). The same token names re-valued, so every
+ * sheet, dialog, HUD, and chat card flips together. Active when:
+ *   - the system's Colour Scheme setting is Dark (body.gl-scheme-dark), or
+ *   - the setting is Auto and Foundry's core UI runs its dark theme
+ *     (body.theme-dark), with a prefers-color-scheme fallback below.
+ * Roles are preserved: parch stays "surface", ink stays "text" — only the
+ * values swap, so fg/bg pairings keep their contrast relationships.
+ * ------------------------------------------------------------------ */
+body.gl-scheme-dark,
+body.theme-dark:not(.gl-scheme-light) {
+  --gl-stage: #0d0b09;
+  --gl-stage-glow: #1a1512;
+  --gl-parch: #1e1a16;
+  --gl-parch-raise: #29241f;
+  --gl-ink: #e7ded0;
+  --gl-ink-soft: #c9beab;
+  --gl-blood: #b02a30;
+  --gl-blood-bright: #e04a50;
+  --gl-line: #3d362c;
+  --gl-line-soft: #4b4335;
+  --gl-line-dark: #7a7161;
+  --gl-muted: #948a78;
+  --gl-muted-2: #b5aa96;
+  --gl-faint: #8d8474;
+  --gl-gold: #d4a017;
+  --gl-good: #6da263;
+  --gl-rouse-bg: #3a1417;
+  --gl-track-agg: #4b4335;
+}
+/* Auto fallback for the OS preference, in case core hasn't stamped a
+ * theme-light/theme-dark class on the body. Same values as above. */
+@media (prefers-color-scheme: dark) {
+  body:not(.theme-light):not(.theme-dark):not(.gl-scheme-light) {
+    --gl-stage: #0d0b09;
+    --gl-stage-glow: #1a1512;
+    --gl-parch: #1e1a16;
+    --gl-parch-raise: #29241f;
+    --gl-ink: #e7ded0;
+    --gl-ink-soft: #c9beab;
+    --gl-blood: #b02a30;
+    --gl-blood-bright: #e04a50;
+    --gl-line: #3d362c;
+    --gl-line-soft: #4b4335;
+    --gl-line-dark: #7a7161;
+    --gl-muted: #948a78;
+    --gl-muted-2: #b5aa96;
+    --gl-faint: #8d8474;
+    --gl-gold: #d4a017;
+    --gl-good: #6da263;
+    --gl-rouse-bg: #3a1417;
+    --gl-track-agg: #4b4335;
+  }
 }
 
 /* The application window frame. ApplicationV2 root gets the `gluniverse-wod`

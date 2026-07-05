@@ -10,7 +10,7 @@ import { registerDataModels } from "./data/index.ts";
 import { registerSheets } from "./sheets/register.ts";
 import { registerChatActions } from "./dice/chat-actions.ts";
 import { registerDiceTerms } from "./dice/terms.ts";
-import { registerSettings } from "./settings.ts";
+import { registerSettings, applyColorScheme } from "./settings.ts";
 import { registerConditions } from "./conditions.ts";
 import { openRollDialog } from "./apps/RollDialogApp.ts";
 import { rouseCheck, remorseCheck } from "./dice/checks.ts";
@@ -39,5 +39,6 @@ Hooks.once("ready", () => {
     frenzyCheck,
   };
   initGmHud();
+  applyColorScheme();
   console.log(`${SYSTEM_ID} | Ready (v${version})`);
 });
