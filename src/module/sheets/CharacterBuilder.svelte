@@ -161,24 +161,42 @@
       .reduce((n, i) => n + (i.system?.value ?? 0), 0),
   );
   const totalDiscDots = $derived(ownedDisciplines.reduce((n, i) => n + (i.system?.value ?? 0), 0));
-  // Caitiff / Thin-blood have no in-clan list: count every Discipline instead.
-  const discSpent = $derived(sys.clan && inClan.length === 0 ? totalDiscDots : inClanDots);
 
   /** Does this Discipline count toward the creation budget? (Caitiff/Thin-blood: all do.) */
   const discCounts = (key: string) =>
     sys.clan ? (inClan.length === 0 ? true : (inClan as string[]).includes(key)) : false;
   const discBudgetLabel = $derived(sys.clan && inClan.length === 0 ? "Discipline dots" : "in-clan dots");
 
+  // Predator-granted Discipline dots are free — they never count against the
+  // creation budget.
+  const predDiscDots = $derived(
+    predApplied
+      ? ((predGrant?.disciplines ?? []) as { key: string; dots: number }[]).reduce(
+          (n, d) => n + (discCounts(d.key) ? d.dots : 0),
+          0,
+        )
+      : 0,
+  );
+  // Caitiff / Thin-blood have no in-clan list: count every Discipline instead.
+  const discSpent = $derived(
+    Math.max(0, (sys.clan && inClan.length === 0 ? totalDiscDots : inClanDots) - predDiscDots),
+  );
+
+  // Advantage items the predator type granted (tagged `fromPredator`) are free
+  // and never count toward the Merit/Background budget or the Flaw minimum.
+  const fromPredator = (i: any) => !!i.flags?.[SYSTEM_ID]?.fromPredator;
   const advDots = $derived(
     items
-      .filter((i) => i.type === "advantage" && ["merit", "background"].includes(i.system?.kind))
+      .filter((i) => i.type === "advantage" && ["merit", "background"].includes(i.system?.kind) && !fromPredator(i))
       .reduce((n, i) => n + (i.system?.value ?? 0), 0),
   );
   const flawDots = $derived(
     items
-      .filter((i) => i.type === "advantage" && i.system?.kind === "flaw")
+      .filter((i) => i.type === "advantage" && i.system?.kind === "flaw" && !fromPredator(i))
       .reduce((n, i) => n + (i.system?.value ?? 0), 0),
   );
+  // Flaws past the required minimum grant extra advantage dots, one for one.
+  const advBudget = $derived(rules.advantageDots + Math.max(0, flawDots - rules.flawDots));
 
   const conceptWarnings = $derived.by(() => {
     const w: string[] = [];
@@ -205,21 +223,25 @@
 
   const advWarnings = $derived.by(() => {
     const w: string[] = [];
-    if (advDots < rules.advantageDots)
-      w.push(`${rules.advantageDots - advDots} Merit / Background dot(s) still to spend (${advDots}/${rules.advantageDots}).`);
-    if (advDots > rules.advantageDots)
-      w.push(`${advDots - rules.advantageDots} Merit / Background dot(s) above the creation budget (${advDots}/${rules.advantageDots}).`);
+    if (advDots < advBudget)
+      w.push(`${advBudget - advDots} Merit / Background dot(s) still to spend (${advDots}/${advBudget}).`);
+    if (advDots > advBudget)
+      w.push(`${advDots - advBudget} Merit / Background dot(s) above the creation budget (${advDots}/${advBudget}).`);
     if (flawDots < rules.flawDots)
       w.push(`Take at least ${rules.flawDots} dot(s) of Flaws (${flawDots}/${rules.flawDots}).`);
     return w;
   });
 
+  // Predator trait deltas (e.g. Blood Leech) shift the expected starting values.
+  const expectedBloodPotency = $derived(rules.bloodPotency + (predApplied ? (predGrant?.bloodPotency ?? 0) : 0));
+  const expectedHumanity = $derived(rules.humanity + (predApplied ? (predGrant?.humanity ?? 0) : 0));
+
   const finishWarnings = $derived.by(() => {
     const w: string[] = [];
-    if ((sys.bloodPotency ?? 0) !== rules.bloodPotency)
-      w.push(`Blood Potency is ${sys.bloodPotency ?? 0}; this campaign starts at ${rules.bloodPotency}.`);
-    if ((sys.humanity?.value ?? 0) !== rules.humanity)
-      w.push(`Humanity is ${sys.humanity?.value ?? 0}; this campaign starts at ${rules.humanity}.`);
+    if ((sys.bloodPotency ?? 0) !== expectedBloodPotency)
+      w.push(`Blood Potency is ${sys.bloodPotency ?? 0}; this campaign starts at ${expectedBloodPotency}.`);
+    if ((sys.humanity?.value ?? 0) !== expectedHumanity)
+      w.push(`Humanity is ${sys.humanity?.value ?? 0}; this campaign starts at ${expectedHumanity}.`);
     return w;
   });
 
@@ -651,19 +673,22 @@
       <div class="step-h">Choose Advantages &amp; Flaws</div>
       <p class="hint">
         Add an entry, then click a number to set its dots right in the list.
-        Merits and Backgrounds share one budget; Flaws have a minimum you must reach.
+        Merits and Backgrounds share one budget; Flaws have a minimum you must reach —
+        every Flaw dot past the minimum grants an extra Merit / Background dot.
+        Anything your predator type granted is free and doesn't count here.
       </p>
       <div class="legend">
-        <span class="lg" class:done={advDots === rules.advantageDots} class:over={advDots > rules.advantageDots}>
-          <b class="lg-r">{advDots}/{rules.advantageDots}</b>
-          {#if advDots < rules.advantageDots}<span class="lg-t">merit &amp; background dots — {rules.advantageDots - advDots} left</span>
-          {:else if advDots === rules.advantageDots}<span class="lg-t">merits &amp; backgrounds ✓ all placed</span>
-          {:else}<span class="lg-t">merits &amp; backgrounds — {advDots - rules.advantageDots} over</span>{/if}
+        <span class="lg" class:done={advDots === advBudget} class:over={advDots > advBudget}>
+          <b class="lg-r">{advDots}/{advBudget}</b>
+          {#if advDots < advBudget}<span class="lg-t">merit &amp; background dots — {advBudget - advDots} left</span>
+          {:else if advDots === advBudget}<span class="lg-t">merits &amp; backgrounds ✓ all placed</span>
+          {:else}<span class="lg-t">merits &amp; backgrounds — {advDots - advBudget} over</span>{/if}
         </span>
         <span class="lg" class:done={flawDots >= rules.flawDots}>
           <b class="lg-r">{flawDots}/{rules.flawDots}</b>
           {#if flawDots < rules.flawDots}<span class="lg-t">flaw dots — {rules.flawDots - flawDots} more needed</span>
-          {:else}<span class="lg-t">flaws ✓ minimum met</span>{/if}
+          {:else if flawDots === rules.flawDots}<span class="lg-t">flaws ✓ minimum met</span>
+          {:else}<span class="lg-t">flaws ✓ +{flawDots - rules.flawDots} bonus advantage dot{flawDots - rules.flawDots > 1 ? "s" : ""}</span>{/if}
         </span>
       </div>
       <div class="tabs">
@@ -694,6 +719,7 @@
               <div class="row" class:owned class:ingrp={grouped}>
                 <span class="row-main">
                   <span class="row-name" class:flaw={advTab === "flaw"}>{a.name}</span>
+                  {#if owned && fromPredator(owned)}<span class="tag soft">Predator type — free</span>{/if}
                   <span class="row-detail">
                     {#if (a.system.maxValue ?? 5) !== (a.system.value ?? 1)}<b>Dots</b> {a.system.value}–{a.system.maxValue}{:else}<b>Dots</b> {a.system.value}{/if}
                   </span>
@@ -701,14 +727,14 @@
                 </span>
                 {#if owned}
                   {@const max = owned.system.maxValue || 5}
-                  {@const counted = ["merit", "background"].includes(advTab)}
+                  {@const counted = ["merit", "background"].includes(advTab) && !fromPredator(owned)}
                   <span class="numsel">
                     {#each Array.from({ length: max }, (_, i) => i + 1) as n (n)}
                       <button
                         class="ns"
                         class:sel={owned.system.value === n}
-                        class:dep={owned.system.value !== n && counted && advDots - owned.system.value + n > rules.advantageDots}
-                        title={counted && advDots - owned.system.value + n > rules.advantageDots
+                        class:dep={owned.system.value !== n && counted && advDots - owned.system.value + n > advBudget}
+                        title={counted && advDots - owned.system.value + n > advBudget
                           ? `Set to ${n} — exceeds the creation budget`
                           : `Set to ${n}`}
                         onclick={() => doc.items.get(owned.id)?.update({ "system.value": n })}
@@ -763,15 +789,15 @@
       <div class="fin-row">
         <span class="fin-k">Blood Potency</span>
         <span class="fin-v">{sys.bloodPotency ?? 0}</span>
-        {#if (sys.bloodPotency ?? 0) !== rules.bloodPotency}
-          <button class="row-add" onclick={() => up("system.bloodPotency", rules.bloodPotency)}>Set to {rules.bloodPotency}</button>
+        {#if (sys.bloodPotency ?? 0) !== expectedBloodPotency}
+          <button class="row-add" onclick={() => up("system.bloodPotency", expectedBloodPotency)}>Set to {expectedBloodPotency}</button>
         {:else}<span class="ok">✓</span>{/if}
       </div>
       <div class="fin-row">
         <span class="fin-k">Humanity</span>
         <span class="fin-v">{sys.humanity?.value ?? 0}</span>
-        {#if (sys.humanity?.value ?? 0) !== rules.humanity}
-          <button class="row-add" onclick={() => up("system.humanity.value", rules.humanity)}>Set to {rules.humanity}</button>
+        {#if (sys.humanity?.value ?? 0) !== expectedHumanity}
+          <button class="row-add" onclick={() => up("system.humanity.value", expectedHumanity)}>Set to {expectedHumanity}</button>
         {:else}<span class="ok">✓</span>{/if}
       </div>
 
