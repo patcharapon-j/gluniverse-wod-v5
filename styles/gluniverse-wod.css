@@ -381,6 +381,10 @@ body.theme-dark:not(.gl-scheme-light) {
   -webkit-mask-image: url("../assets/dice/bestial.svg");
   mask-image: url("../assets/dice/bestial.svg");
 }
+.gl-die .gl-face-rouse {
+  -webkit-mask-image: url("../assets/dice/rouse.svg");
+  mask-image: url("../assets/dice/rouse.svg");
+}
 /* The raw value tucked into the corner so the glyph stays legible. */
 .gl-die em {
   position: absolute;
@@ -416,6 +420,17 @@ body.theme-dark:not(.gl-scheme-light) {
   background: var(--gl-blood);
   color: var(--gl-parch);
   border-color: var(--gl-blood);
+}
+/* Rouse chips mirror the 3D die — bone face, blood glyph — the inverse of the
+   Hunger palette so the two never read as the same denomination. */
+.gl-die.rouse {
+  border-color: var(--gl-blood);
+  color: var(--gl-blood);
+  background: var(--gl-parch-raise);
+}
+.gl-die.rouse.hit {
+  border-color: var(--gl-blood-bright);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--gl-blood-bright) 35%, transparent);
 }
 .gl-die.rerolled {
   outline: 2px dotted var(--gl-gold);

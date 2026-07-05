@@ -16,8 +16,9 @@ export async function rouseCheck(
   actor: any,
   opts: { reroll?: boolean; label?: string } = {},
 ): Promise<boolean> {
-  // Rouse checks ride the Hunger die so the 3D dice use the blood preset.
-  const roll = await new Roll(opts.reroll ? "2dhkh" : "1dh").evaluate();
+  // Rouse checks roll the dedicated Rouse die (`dr`, bone-and-blood preset) so
+  // they can never be confused with Hunger dice landing in the same tray.
+  const roll = await new Roll(opts.reroll ? "2drkh" : "1dr").evaluate();
   const dice: number[] = roll.dice[0].results.map((r: any) => r.result);
   const best = Math.max(...dice);
   const success = best >= 6;
