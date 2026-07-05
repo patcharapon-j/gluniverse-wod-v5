@@ -2,12 +2,12 @@
  * Dice So Nice! integration for the system's custom dice types: `dv` (regular),
  * `dh` (Hunger) and `dr` (Rouse), all ten-sided (see ../dice/terms.ts). Presets
  * are keyed to the die type on a d10 shape — black resin with gold glyphs for
- * regular dice, blood red metal with white glyphs for Hunger, and polished bone
- * with blood-red glyphs for Rouse, so a Rouse check is unmistakable next to
- * Hunger dice. Faces reuse the glyph PNGs as bump maps for relief, and as
- * emissive maps on the faces that matter: the 10 on regular dice, the 1 and 10
- * on Hunger dice, every success face (6+) on Rouse dice. No-op when Dice So
- * Nice isn't installed.
+ * regular dice, lacquered blood-red with white glyphs for Hunger, and polished
+ * bone with blood-red glyphs for Rouse, so a Rouse check is unmistakable next to
+ * Hunger dice. Faces carry dedicated soft-beveled bump maps for relief (see
+ * build-dice-icons.mjs) and the crisp glyph as an emissive map on the faces that
+ * matter: the 10 on regular dice, the 1 and 10 on Hunger dice, every success
+ * face (6+) on Rouse dice. No-op when Dice So Nice isn't installed.
  */
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -27,6 +27,10 @@ const ICON = (name: string) => `systems/${SYSTEM_ID}/assets/dice/${name}.png`;
 
 type DieKind = "regular" | "hunger" | "rouse";
 
+/** Keep the glyph paths, blank out the failure faces (" " → undefined). */
+const glyphsOnly = (faces: string[]): (string | undefined)[] =>
+  faces.map((l) => (l.endsWith(".png") ? l : undefined));
+
 /**
  * Face labels, values 1..10: glyphs on 6+ (and Hunger 1), blank failures.
  * Regular dice use the gold glyph variants; Hunger dice stay white. Rouse dice
@@ -45,17 +49,24 @@ function labels(kind: DieKind): string[] {
   return out;
 }
 
-/** Bump maps mirror the labels so the glyphs read as raised relief. */
+/**
+ * Bump maps use the dedicated `*-bump` height maps (see build-dice-icons.mjs) —
+ * soft-beveled slopes, not the flat glyph fill — so the relief actually catches
+ * light across the whole glyph instead of a hairline rim.
+ */
 function bumpMaps(kind: DieKind): (string | undefined)[] {
-  return labels(kind).map((l) => (l.endsWith(".png") ? l : undefined));
+  return glyphsOnly(labels(kind)).map((l) =>
+    l ? l.replace(/\.png$/, "-bump.png") : undefined,
+  );
 }
 
 /**
  * Emission only on the faces that matter: 10 regular; 1 and 10 Hunger; every
- * success face on Rouse (the only question a Rouse check asks).
+ * success face on Rouse (the only question a Rouse check asks). Uses the crisp
+ * glyph (not the blurred bump map) so the glow stays sharp.
  */
 function emissiveMaps(kind: DieKind): (string | undefined)[] {
-  if (kind === "rouse") return bumpMaps(kind);
+  if (kind === "rouse") return glyphsOnly(labels(kind));
   const out: (string | undefined)[] = new Array(10).fill(undefined);
   out[9] = ICON(kind === "hunger" ? "messy" : "crit-gold");
   if (kind === "hunger") out[0] = ICON("bestial");
@@ -93,10 +104,14 @@ export function registerDiceSoNice(): void {
         outline: "#3a0608",
         edge: "#e0b7b7",
         texture: "marble",
-        material: "metal",
+        // Glossy dielectric, not "metal": a metal only mirrors the environment,
+        // so DSN's soft lighting leaves the embossed glyph looking flat. Plastic
+        // shades diffusely off the bump-perturbed normals, so the relief reads —
+        // and a wet, lacquered blood-red suits Hunger better than brushed steel.
+        material: "plastic",
         font: "Oswald",
         emissive: "#ff2222",
-        emissiveIntensity: 0.15,
+        emissiveIntensity: 0.12,
       });
 
       // Rouse: the Hunger palette inverted — bone die, blood glyphs — so the
