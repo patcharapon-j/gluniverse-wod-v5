@@ -72,6 +72,21 @@ export class CeremonyData extends (foundry.abstract.TypeDataModel as any) {
   }
 }
 
+/** Thin-Blood Alchemy Formula — the thin-blood analogue to a Ritual. */
+export class FormulaData extends (foundry.abstract.TypeDataModel as any) {
+  static defineSchema(): any {
+    return {
+      ...describable(),
+      level: int(1, { min: 1, max: 5 }),
+      pool: str(),
+      ingredients: str(),
+      process: html(),
+      duration: str(),
+      activationCost: str(), // e.g. "One Rouse Check"
+    };
+  }
+}
+
 /** Advantage — merit, flaw, background, or loresheet entry. */
 export class AdvantageData extends (foundry.abstract.TypeDataModel as any) {
   static defineSchema(): any {
@@ -136,6 +151,7 @@ export const ITEM_MODELS = {
   power: PowerData,
   ritual: RitualData,
   ceremony: CeremonyData,
+  formula: FormulaData,
   advantage: AdvantageData,
   weapon: WeaponData,
   armor: ArmorData,

@@ -34,16 +34,39 @@ export class SheetState {
   flags = $state<any>({});
   items = $state<ItemSnapshot[]>([]);
   effects = $state<EffectSnapshot[]>([]);
+  /**
+   * Whether the viewing user may modify the document. Mirrors the sheet's
+   * `isEditable` (ownership + compendium locks), falling back to `doc.isOwner`.
+   * GMs are always owners. Components gate every write behind this.
+   */
+  editable = $state(false);
+  /**
+   * True when the user's permission is exactly LIMITED (not OBSERVER/OWNER).
+   * Actor sheets render a stripped-down portrait + biography view in this case.
+   */
+  limited = $state(false);
   /** Bumped on every sync so components can force-depend on freshness. */
   rev = $state(0);
 
-  constructor(doc: any) {
-    this.sync(doc);
+  constructor(doc: any, app?: any) {
+    this.sync(doc, app);
   }
 
-  sync(doc: any): void {
+  sync(doc: any, app?: any): void {
     this.name = doc.name;
     this.img = doc.img;
+    // Prefer the ApplicationV2 sheet's own editable flag (respects ownership +
+    // compendium locks); fall back to raw ownership when no app is available.
+    this.editable = app?.isEditable ?? !!doc.isOwner;
+    try {
+      const user = (globalThis as any).game?.user;
+      this.limited =
+        !!user &&
+        !!doc.testUserPermission?.(user, "LIMITED") &&
+        !doc.testUserPermission?.(user, "OBSERVER");
+    } catch {
+      this.limited = false;
+    }
     this.system = foundry.utils.deepClone(doc.system);
     this.flags = foundry.utils.deepClone(doc.flags ?? {});
     this.items = doc.items

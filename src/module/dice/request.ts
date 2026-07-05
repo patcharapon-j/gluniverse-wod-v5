@@ -22,7 +22,6 @@ import type {
   RequestTarget,
   ContestPairing,
   RequestFulfilledPayload,
-  RequestSocketPayload,
 } from "./request-types.ts";
 import { REQUEST_CARD_KIND, SOCKET_NAME } from "./request-types.ts";
 
@@ -175,7 +174,9 @@ export function requestCardHTML(state: RequestState): string {
         }
         const winnerName =
           p.winner === "target" ? p.target.actorName : oppName;
-        return `<div class="gl-req-res-line">vs ${esc(oppName)}: ${esc(winnerName)} wins by ${Math.abs(p.margin as number)}</div>`;
+        // Margin 0 with a winner = a tie handed to the defender (V5 core).
+        const tieNote = p.margin === 0 ? " (tie — defender)" : "";
+        return `<div class="gl-req-res-line">vs ${esc(oppName)}: ${esc(winnerName)} wins by ${Math.abs(p.margin as number)}${tieNote}</div>`;
       })
       .join("");
     if (lines) resolution = `<div class="gl-req-resolution">${lines}</div>`;
@@ -208,16 +209,23 @@ export function requestCardHTML(state: RequestState): string {
 /**
  * Per-target contest outcomes. margin/winner stay null until BOTH that target
  * and the opposition have landed a result. margin = target − opposition.
+ *
+ * Equal successes resolve by the request's tieBreak: V5 gives ties to the
+ * defender/resister, so the default (and the behaviour of old messages that
+ * predate the field) hands them to the opposition; "none" keeps a neutral tie.
  */
 export function contestPairings(state: RequestState): ContestPairing[] {
   const oppResult = state.opposition?.result;
+  const tieBreak = state.tieBreak ?? "opposition";
   return state.targets.map((target) => {
     if (!target.result || !oppResult) {
       return { target, margin: null, winner: null };
     }
     const margin = target.result.successes - oppResult.successes;
-    const winner: ContestPairing["winner"] =
-      margin > 0 ? "target" : margin < 0 ? "opposition" : "tie";
+    let winner: ContestPairing["winner"];
+    if (margin > 0) winner = "target";
+    else if (margin < 0) winner = "opposition";
+    else winner = tieBreak === "none" ? "tie" : tieBreak;
     return { target, margin, winner };
   });
 }
@@ -235,7 +243,8 @@ export async function createRollRequest(
     (ui as any).notifications?.warn?.("Only the Storyteller can request rolls.");
     return null;
   }
-  const full: RequestState = { ...state, cancelled: false };
+  // New requests default ties to the defender (the opposition) per V5 core.
+  const full: RequestState = { tieBreak: "opposition", ...state, cancelled: false };
   return ChatMessage.create({
     // Public: no whisper. Authored by the GM.
     user: (game as any).user?.id,
@@ -336,13 +345,13 @@ export async function cancelRequest(message: any): Promise<void> {
  * client to pick up.
  */
 export async function routeRequestUpdate(
-  payload: RequestSocketPayload,
+  payload: RequestFulfilledPayload,
 ): Promise<void> {
   const activeGmId = (game as any).users?.activeGM?.id;
   const myId = (game as any).user?.id;
   if (activeGmId && activeGmId === myId) {
     const message = (game as any).messages?.get(payload.requestMessageId);
-    await applyFulfillment(message, payload as RequestFulfilledPayload);
+    await applyFulfillment(message, payload);
     return;
   }
   (game as any).socket?.emit(SOCKET_NAME, payload);

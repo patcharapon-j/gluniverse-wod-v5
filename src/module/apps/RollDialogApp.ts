@@ -11,6 +11,7 @@ import { mount, unmount } from "svelte";
 import RollDialog from "../sheets/RollDialog.svelte";
 import { rollPool } from "../dice/roll-v5.ts";
 import { postRollCard, rollCardHTML } from "../dice/chat.ts";
+import type { WeaponRollInfo } from "../dice/chat.ts";
 import { rouseCheck, bloodSurgeBonus } from "../dice/checks.ts";
 import { resolvePool } from "../dice/pool.ts";
 import { getSetting, SETTINGS } from "../settings.ts";
@@ -43,6 +44,8 @@ export interface RollSeed {
   modifier?: number;
   /** The pool the request asked for, used to compute a deviation note. */
   requestedPool?: RequestPoolSpec;
+  /** Weapon context: a winning roll shows damage + an Apply Damage button. */
+  weapon?: WeaponRollInfo;
 }
 
 const AppV2 = foundry.applications.api.ApplicationV2;
@@ -107,6 +110,7 @@ export class RollDialogApp extends AppV2 {
       requestMessageId: seed.requestMessageId,
       deviation,
       forcePublic: fromRequest,
+      weapon: seed.weapon,
     });
 
     if (fromRequest) {
@@ -203,11 +207,25 @@ export function rollPower(actor: any, power: any): void {
  */
 export function rollWeapon(actor: any, weapon: any): void {
   const poolStr: string = weapon?.system?.pool ?? "";
+  // Thread the weapon's mechanics into the roll so the resulting card can offer
+  // the V5 damage summary + Apply Damage flow.
+  const info: WeaponRollInfo = {
+    id: weapon?.id,
+    name: weapon?.name ?? "Weapon",
+    damage: Math.max(0, weapon?.system?.damage ?? 0),
+    damageType:
+      weapon?.system?.damageType === "aggravated" ? "aggravated" : "superficial",
+  };
   if (poolStr) {
     const { total } = resolvePool(actor, poolStr);
-    openRollDialog(actor, { fixedPool: total, poolLabel: poolStr, flavor: weapon.name });
+    openRollDialog(actor, {
+      fixedPool: total,
+      poolLabel: poolStr,
+      flavor: weapon.name,
+      weapon: info,
+    });
   } else {
-    openRollDialog(actor, { flavor: weapon.name });
+    openRollDialog(actor, { flavor: weapon.name, weapon: info });
   }
 }
 

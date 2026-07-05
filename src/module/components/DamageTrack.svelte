@@ -3,9 +3,10 @@
     superficial?: number;
     aggravated?: number;
     max?: number;
+    disabled?: boolean;
     onchange?: (v: { superficial: number; aggravated: number }) => void;
   }
-  let { superficial = 0, aggravated = 0, max = 0, onchange }: Props = $props();
+  let { superficial = 0, aggravated = 0, max = 0, disabled = false, onchange }: Props = $props();
 
   // Box states: aggravated (✕) fill first, then superficial (/), then empty.
   const states = $derived(
@@ -15,6 +16,7 @@
   );
 
   function cycle(i: number) {
+    if (disabled) return;
     const cur = states[i];
     const next = cur === "e" ? "s" : cur === "s" ? "a" : "e";
     const arr = [...states];
@@ -33,9 +35,11 @@
       class="box"
       class:sup={s === "s"}
       class:agg={s === "a"}
+      class:readonly={disabled}
       role="button"
-      tabindex="0"
+      tabindex={disabled ? -1 : 0}
       aria-label={`Damage box ${i + 1}`}
+      aria-disabled={disabled}
       onclick={() => cycle(i)}
       onkeydown={(e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), cycle(i))}
     ></span>
@@ -59,6 +63,12 @@
     box-sizing: border-box;
     user-select: none;
     transition: background 0.18s ease, border-color 0.12s ease;
+  }
+  .box.readonly {
+    cursor: default;
+  }
+  .box.readonly:hover {
+    border-color: var(--gl-ink);
   }
   /* Damage strokes span the whole box, matching the Humanity stain cross:
      one diagonal for superficial, two crossed for aggravated. Both strokes are

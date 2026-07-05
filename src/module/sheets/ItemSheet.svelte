@@ -14,7 +14,11 @@
   const sys = $derived(snap.system);
   const type = $derived(doc.type as string);
 
+  // Editable mirrors the sheet's isEditable (ownership + compendium locks).
+  const editable = $derived(snap.editable as boolean);
+
   function up(path: string, value: unknown) {
+    if (!editable) return;
     doc.update({ [path]: value });
   }
 
@@ -23,15 +27,16 @@
 
 <div class="gl-item">
   <header class="ihdr">
-    <button class="thumbwrap" title="Change image" onclick={() => (doc as any).sheet?._onEditImage?.()} aria-label="Change image">
+    <button class="thumbwrap" title="Change image" disabled={!editable} onclick={() => editable && (doc as any).sheet?._onEditImage?.()} aria-label="Change image">
       <img class="thumb" src={snap.img} alt="" onerror={(e) => ((e.currentTarget as HTMLImageElement).style.visibility = "hidden")} />
     </button>
     <div class="titles">
       <div class="kind">{prettify(type)}</div>
-      <input class="iname" value={snap.name} onchange={(e) => doc.update({ name: e.currentTarget.value })} />
+      <input class="iname" value={snap.name} disabled={!editable} onchange={(e) => editable && doc.update({ name: e.currentTarget.value })} />
     </div>
   </header>
 
+  <fieldset class="fields-wrap" disabled={!editable}>
   <div class="fields">
     {#if type === "discipline"}
       <label class="field wide">
@@ -43,7 +48,7 @@
       </label>
       <div class="field">
         <span>Rating</span>
-        <DotRating value={sys.value} onchange={(n) => up("system.value", n)} />
+        <DotRating value={sys.value} readonly={!editable} onchange={(n) => up("system.value", n)} />
       </div>
     {/if}
 
@@ -100,6 +105,29 @@
       <label class="field wide">
         <span>Ingredients</span>
         <input value={sys.ingredients} onchange={(e) => up("system.ingredients", e.currentTarget.value)} />
+      </label>
+    {/if}
+
+    {#if type === "formula"}
+      <label class="field">
+        <span>Level</span>
+        <input type="number" min="1" max="5" value={sys.level} onchange={(e) => up("system.level", Number(e.currentTarget.value))} />
+      </label>
+      <label class="field wide">
+        <span>Dice Pool</span>
+        <input value={sys.pool} onchange={(e) => up("system.pool", e.currentTarget.value)} />
+      </label>
+      <label class="field wide">
+        <span>Activation Cost</span>
+        <input value={sys.activationCost} placeholder="e.g. One Rouse Check" onchange={(e) => up("system.activationCost", e.currentTarget.value)} />
+      </label>
+      <label class="field wide">
+        <span>Ingredients</span>
+        <input value={sys.ingredients} onchange={(e) => up("system.ingredients", e.currentTarget.value)} />
+      </label>
+      <label class="field wide">
+        <span>Duration</span>
+        <input value={sys.duration} onchange={(e) => up("system.duration", e.currentTarget.value)} />
       </label>
     {/if}
 
@@ -206,7 +234,7 @@
     ></textarea>
   </div>
 
-  {#if type === "ritual" || type === "ceremony"}
+  {#if type === "ritual" || type === "ceremony" || type === "formula"}
     <div class="desc">
       <div class="sect-h">Process</div>
       <textarea
@@ -216,6 +244,7 @@
       ></textarea>
     </div>
   {/if}
+  </fieldset>
 </div>
 
 <style>
@@ -268,6 +297,15 @@
   .iname:focus {
     outline: none;
     border-bottom: 1px solid var(--gl-blood);
+  }
+  .fields-wrap {
+    border: none;
+    margin: 0;
+    padding: 0;
+    min-width: 0;
+  }
+  .fields-wrap:disabled {
+    opacity: 1;
   }
   .fields {
     display: flex;

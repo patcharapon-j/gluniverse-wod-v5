@@ -825,3 +825,116 @@ body.theme-dark:not(.gl-scheme-light) {
   margin-bottom: 6px;
   display: inline-block;
 }
+
+/* ============================================================================
+ * Damage application (weapon roll cards + applied-damage notes). Colours come
+ * from --gl-* vars, so the dark-mode block covers this section too.
+ * ==========================================================================*/
+.gl-card-damage {
+  margin-top: 6px;
+  padding: 6px 8px;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+  border: 1px solid color-mix(in srgb, var(--gl-blood) 35%, var(--gl-line));
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--gl-blood) 6%, transparent);
+}
+.gl-dmg-total {
+  font-family: var(--gl-cond);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  font-size: 12px;
+  color: var(--gl-blood);
+}
+.gl-dmg-total b {
+  font-size: 16px;
+  color: var(--gl-blood-bright);
+}
+.gl-dmg-calc {
+  font-family: var(--gl-cond);
+  font-size: 10px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--gl-muted);
+}
+
+/* Public "X takes N damage" note posted when damage is applied. */
+.gl-damage-note {
+  font-size: 13px;
+  color: var(--gl-ink-soft);
+}
+.gl-damage-note .gl-dmg-line {
+  font-style: italic;
+}
+.gl-damage-note .gl-dmg-threshold {
+  margin-top: 4px;
+  font-family: var(--gl-cond);
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--gl-blood-bright);
+}
+
+/* ============================================================================
+ * Compulsion cards. A public card posted after a Bestial Failure / Messy
+ * Critical: first the general + clan Compulsion options, then the chosen one
+ * with a Resolve affordance. Reuses the .gl-card parchment shell.
+ * ==========================================================================*/
+.gl-compulsion-opts {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.gl-compulsion-opt {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  text-align: left;
+  text-transform: none;
+  letter-spacing: normal;
+  padding: 7px 10px;
+}
+.gl-compulsion-opt .gl-compulsion-name {
+  font-family: var(--gl-cond);
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  font-size: 11px;
+  font-weight: 600;
+}
+.gl-compulsion-opt .gl-compulsion-sum {
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: normal;
+  color: var(--gl-muted-2);
+}
+.gl-compulsion-opt:hover .gl-compulsion-sum {
+  color: var(--gl-parch);
+}
+.gl-compulsion-body {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 7px 10px;
+  border: 1px solid color-mix(in srgb, var(--gl-blood) 35%, var(--gl-line));
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--gl-blood) 6%, transparent);
+}
+.gl-compulsion-body .gl-compulsion-name {
+  font-family: var(--gl-cond);
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--gl-blood);
+}
+.gl-compulsion-body .gl-compulsion-sum {
+  font-size: 13px;
+  color: var(--gl-ink-soft);
+}

@@ -19,6 +19,7 @@ export const CONDITIONS: Condition[] = [
   { id: "torpor", name: "GLUNIVERSE.Conditions.Torpor", img: "icons/svg/sleep.svg" },
   { id: "staked", name: "GLUNIVERSE.Conditions.Staked", img: "icons/svg/paralysis.svg" },
   { id: "impaired", name: "GLUNIVERSE.Conditions.Impaired", img: "icons/svg/downgrade.svg" },
+  { id: "compulsion", name: "Compulsion", img: "icons/svg/daze.svg" },
   { id: "hunted", name: "GLUNIVERSE.Conditions.Hunted", img: "icons/svg/target.svg" },
   { id: "burning", name: "GLUNIVERSE.Conditions.Burning", img: "icons/svg/fire.svg" },
   { id: "sunlight", name: "GLUNIVERSE.Conditions.Sunlight", img: "icons/svg/sun.svg" },

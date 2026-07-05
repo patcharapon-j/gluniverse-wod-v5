@@ -6,9 +6,22 @@
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { CLANS, PREDATOR_TYPES, RESONANCES, RESONANCE_INTENSITIES } from "../config.ts";
-import { int, str, html, schema, arr } from "./fields.ts";
+import { CLANS, PREDATOR_TYPES, RESONANCES, RESONANCE_INTENSITIES, BLOOD_POTENCY } from "../config.ts";
+import { int, str, html, bool, schema, arr } from "./fields.ts";
 import { attributesField, skillsField, detailsField, trackField, deriveTrack } from "./common.ts";
+
+/**
+ * Derive Humanity-vs-Stains overlap. In V5, when Stains fill boxes that overlap
+ * the character's remaining Humanity (stains > 10 − humanity) the character is
+ * Impaired. Sets `humanityImpaired` and `stainsOverlap` on the model.
+ */
+function deriveHumanityImpairment(model: any): void {
+  const humanity = model.humanity?.value ?? 0;
+  const stains = model.humanity?.stains ?? 0;
+  const freeBoxes = 10 - humanity;
+  model.stainsOverlap = Math.max(0, stains - freeBoxes);
+  model.humanityImpaired = stains > freeBoxes;
+}
 
 /** Vampire — the full player-character model. */
 export class VampireData extends (foundry.abstract.TypeDataModel as any) {
@@ -31,7 +44,22 @@ export class VampireData extends (foundry.abstract.TypeDataModel as any) {
       resonance: schema({
         type: str("", { choices: [...RESONANCES] }),
         intensity: str("", { choices: [...RESONANCE_INTENSITIES] }),
+        // Dyscrasia: a named, potent side-effect of feeding on an Acute
+        // resonance. Free text so the table can describe its bespoke effect.
+        dyscrasia: str(),
+        dyscrasiaActive: bool(false),
       }),
+      // Blood Bonds this vampire is part of — as a thrall (bound to another)
+      // or a regnant (someone bound to them). `rating` is the current bond
+      // strength (0–6). `actorUuid` links the other party when known.
+      bonds: arr(
+        schema({
+          name: str(),
+          actorUuid: str(),
+          rating: int(0, { min: 0, max: 6 }),
+          kind: str("thrall", { choices: ["thrall", "regnant"] }),
+        }),
+      ),
       details: detailsField(),
       xp: schema({ value: int(0, { min: 0 }), total: int(0, { min: 0 }) }),
       convictions: arr(schema({ conviction: str(), touchstone: str() })),
@@ -43,6 +71,15 @@ export class VampireData extends (foundry.abstract.TypeDataModel as any) {
     const a = (this as any).attributes;
     deriveTrack((this as any).health, (a.stamina?.value ?? 0) + 3);
     deriveTrack((this as any).willpower, (a.composure?.value ?? 0) + (a.resolve?.value ?? 0));
+
+    // Bane Severity — from the Blood Potency table. Thin-bloods and Caitiff
+    // have no clan bane, so their severity is 0 regardless of Blood Potency.
+    const bp = Math.max(0, Math.min(10, Math.floor((this as any).bloodPotency ?? 0)));
+    const clan = (this as any).clan;
+    (this as any).baneSeverity =
+      clan === "thinBlood" || clan === "caitiff" ? 0 : (BLOOD_POTENCY[bp]?.bane ?? 0);
+
+    deriveHumanityImpairment(this as any);
   }
 }
 
@@ -65,6 +102,7 @@ export class MortalData extends (foundry.abstract.TypeDataModel as any) {
     const a = (this as any).attributes;
     deriveTrack((this as any).health, (a.stamina?.value ?? 0) + 3);
     deriveTrack((this as any).willpower, (a.composure?.value ?? 0) + (a.resolve?.value ?? 0));
+    deriveHumanityImpairment(this as any);
   }
 }
 
@@ -77,7 +115,14 @@ export class GhoulData extends (foundry.abstract.TypeDataModel as any) {
       health: trackField(),
       willpower: trackField(),
       humanity: schema({ value: int(7, { min: 0, max: 10 }), stains: int(0, { min: 0, max: 10 }) }),
-      bloodBond: schema({ regnant: str(), rating: int(0, { min: 0, max: 6 }) }),
+      bloodBond: schema({
+        regnant: str(),
+        rating: int(0, { min: 0, max: 6 }),
+        // Structured link to the regnant actor plus the number of drinks taken
+        // this bonding cycle (3 drinks from one vampire = a full bond).
+        regnantUuid: str(),
+        drinks: int(0, { min: 0, max: 3 }),
+      }),
       vitae: int(0, { min: 0, max: 10 }),
       details: detailsField(),
       xp: schema({ value: int(0, { min: 0 }), total: int(0, { min: 0 }) }),
@@ -89,6 +134,7 @@ export class GhoulData extends (foundry.abstract.TypeDataModel as any) {
     const a = (this as any).attributes;
     deriveTrack((this as any).health, (a.stamina?.value ?? 0) + 3);
     deriveTrack((this as any).willpower, (a.composure?.value ?? 0) + (a.resolve?.value ?? 0));
+    deriveHumanityImpairment(this as any);
   }
 }
 

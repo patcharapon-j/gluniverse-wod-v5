@@ -38,7 +38,7 @@ function svelteSheetMixin(Base: any, component: Component<any>, opts: SvelteShee
     /** Mount once, then only re-sync the reactive snapshot on later renders. */
     _replaceHTML(_result: unknown, content: HTMLElement): void {
       if (this._gl_svelte && this._gl_state) {
-        this._gl_state.sync(this.document);
+        this._gl_state.sync(this.document, this);
         return;
       }
       // Resolve the content region whether ApplicationV2 hands us the frame or
@@ -46,7 +46,7 @@ function svelteSheetMixin(Base: any, component: Component<any>, opts: SvelteShee
       const target: HTMLElement =
         content?.matches?.(".window-content") ? content
         : (content?.querySelector?.(".window-content") as HTMLElement) ?? content;
-      this._gl_state = new SheetState(this.document);
+      this._gl_state = new SheetState(this.document, this);
       this._gl_svelte = mount(component, {
         target,
         props: { doc: this.document, snap: this._gl_state, app: this },
@@ -56,6 +56,8 @@ function svelteSheetMixin(Base: any, component: Component<any>, opts: SvelteShee
     /** Drop handler the Svelte root binds to; actor sheets accept items. */
     async glHandleDrop(event: DragEvent): Promise<boolean> {
       if (this.document?.documentName !== "Actor") return false;
+      // Non-editable viewers (observers / limited) may not add to the actor.
+      if (!this.isEditable) return false;
       return handleActorDrop(this.document, event);
     }
 

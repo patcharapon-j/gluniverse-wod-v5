@@ -165,6 +165,7 @@ export const ITEM_TYPES = [
   "power",
   "ritual",
   "ceremony",
+  "formula",
   "advantage",
   "weapon",
   "armor",

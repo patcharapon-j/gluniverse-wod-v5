@@ -102,6 +102,68 @@ export const CLAN_INFO: Record<Clan, ClanInfo> = {
   },
 };
 
+/**
+ * A single Compulsion the Storyteller may impose after a Bestial Failure or
+ * Messy Critical. `summary` is an original one-line mechanical description of
+ * what the Compulsion drives the character to do and the penalty for resisting.
+ */
+export interface CompulsionInfo {
+  id: string;
+  name: string;
+  summary: string;
+}
+
+/**
+ * The four general Compulsions available to any vampire regardless of clan.
+ * Each persists until satisfied; while resisting or acting against it the
+ * character takes a two-die penalty to any pool unrelated to indulging it.
+ */
+export const GENERAL_COMPULSIONS: CompulsionInfo[] = [
+  {
+    id: "hunger",
+    name: "Hunger",
+    summary:
+      "Must attempt to feed at the first opportunity; two-die penalty on any pool that isn't about slaking Hunger, until you have fed.",
+  },
+  {
+    id: "dominance",
+    name: "Dominance",
+    summary:
+      "Must assert dominance and one-up those around you; two-die penalty on any pool not spent putting someone in their place, until you have.",
+  },
+  {
+    id: "harm",
+    name: "Harm",
+    summary:
+      "Must inflict physical or emotional harm on those nearby; two-die penalty on any pool that isn't about causing suffering, until harm is done.",
+  },
+  {
+    id: "paranoia",
+    name: "Paranoia",
+    summary:
+      "Must escape perceived danger and treat everyone as a threat; two-die penalty on any pool not spent hiding or fleeing, until you feel safe.",
+  },
+];
+
+/** Look up a general Compulsion by id. */
+export function generalCompulsion(id: string): CompulsionInfo | undefined {
+  return GENERAL_COMPULSIONS.find((c) => c.id === id);
+}
+
+/**
+ * The clan's specific Compulsion as a {@link CompulsionInfo}, id `clan:<clan>`.
+ * Returns undefined for clans without one (Caitiff, Thin-blood).
+ */
+export function clanCompulsionInfo(clan: string): CompulsionInfo | undefined {
+  const info = CLAN_INFO[clan as Clan];
+  if (!info || !info.compulsion || info.compulsion.startsWith("None")) return undefined;
+  // The stored string is "Name — mechanical summary"; split the display name off.
+  const dash = info.compulsion.indexOf("—");
+  const name = dash >= 0 ? info.compulsion.slice(0, dash).trim() : info.compulsion.trim();
+  const summary = dash >= 0 ? info.compulsion.slice(dash + 1).trim() : info.compulsion.trim();
+  return { id: `clan:${clan}`, name, summary };
+}
+
 /** In-clan Disciplines for XP-cost purposes (empty = treat all as out-of-clan). */
 export function inClanDisciplines(clan: string): Discipline[] {
   return CLAN_INFO[clan as Clan]?.disciplines ?? [];

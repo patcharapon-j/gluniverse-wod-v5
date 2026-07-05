@@ -1,11 +1,14 @@
 /**
- * System socket — the roll-request feature's only cross-client channel.
+ * System socket — the cross-client channel for GM-mediated writes.
  *
- * A player's client cannot update the GM-authored request card, so on fulfilment
- * it emits a "requestFulfilled" payload; the SINGLE active-GM client listens here
- * and folds the result into the card via {@link applyFulfillment}. Every other
- * client (including non-active GMs and the emitting player) ignores the payload.
- * Registered during the "ready" hook.
+ * A player's client cannot update documents it does not own, so it emits a
+ * payload here and the SINGLE active-GM client performs the write:
+ * - "requestFulfilled": folds a roll result into the GM-authored request card
+ *   via {@link applyFulfillment}.
+ * - "applyDamage": applies weapon damage to an actor the player cannot write
+ *   via {@link applyDamageToActor}.
+ * Every other client (including non-active GMs and the emitting player) ignores
+ * the payload. Registered during the "ready" hook.
  */
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -15,8 +18,10 @@ import { SOCKET_NAME } from "./dice/request-types.ts";
 import type {
   RequestSocketPayload,
   RequestFulfilledPayload,
+  ApplyDamagePayload,
 } from "./dice/request-types.ts";
 import { applyFulfillment } from "./dice/request.ts";
+import { applyDamageToActor } from "./dice/chat-actions.ts";
 
 /** True only on the client Foundry considers the active (writing) GM. */
 function isActiveGM(): boolean {
@@ -35,14 +40,21 @@ export function registerSystemSocket(): void {
 
   socket.on(SOCKET_NAME, async (payload: RequestSocketPayload) => {
     try {
-      // Only the single active-GM client is allowed to write the card.
+      // Only the single active-GM client is allowed to perform the write.
       if (!isActiveGM()) return;
-      if (!payload || payload.type !== "requestFulfilled") return;
+      if (!payload) return;
 
-      const fulfilled = payload as RequestFulfilledPayload;
-      const message = (game as any).messages?.get(fulfilled.requestMessageId);
-      if (!message) return;
-      await applyFulfillment(message, fulfilled);
+      if (payload.type === "requestFulfilled") {
+        const fulfilled = payload as RequestFulfilledPayload;
+        const message = (game as any).messages?.get(fulfilled.requestMessageId);
+        if (!message) return;
+        await applyFulfillment(message, fulfilled);
+      } else if (payload.type === "applyDamage") {
+        const damage = payload as ApplyDamagePayload;
+        const actor: any = await fromUuid(damage.targetActorUuid);
+        if (!actor) return;
+        await applyDamageToActor(actor, damage);
+      }
     } catch (err) {
       console.error(`${SYSTEM_ID} | socket handler failed`, err);
     }

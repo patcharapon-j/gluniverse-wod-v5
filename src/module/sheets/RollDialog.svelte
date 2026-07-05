@@ -47,6 +47,13 @@
   let useResonance = $state(true);
   let chosenSpecs = $state<Record<string, boolean>>({});
 
+  // Stain impairment: when Stains overlap Humanity the character takes −2 dice
+  // on all pools. Default it on (as a modifier) but let the player drop it —
+  // the note stays visible so the penalty is never silently applied.
+  /* svelte-ignore state_referenced_locally */
+  const impaired = !!sys.humanityImpaired;
+  let applyImpaired = $state(impaired);
+
   /* svelte-ignore state_referenced_locally */
   const fixedPool = seed.fixedPool ?? 0;
 
@@ -68,9 +75,10 @@
       : { dice: 0, disciplines: [] as string[] };
   });
   const resonance = $derived(useResonance ? resoAvail.dice : 0);
+  const impairPenalty = $derived(applyImpaired ? -2 : 0);
 
   const pool = $derived(
-    Math.max(0, fixedPool + attrVal + skillVal + discVal + specBonus + modifier + resonance),
+    Math.max(0, fixedPool + attrVal + skillVal + discVal + specBonus + modifier + resonance + impairPenalty),
   );
   const totalPool = $derived(pool + surge);
 
@@ -193,6 +201,13 @@
     </label>
   {/if}
 
+  {#if impaired}
+    <label class="surge impair-toggle" class:on={applyImpaired}>
+      <input type="checkbox" bind:checked={applyImpaired} />
+      <span>Impaired <i>(−2 dice — stains overlap Humanity)</i></span>
+    </label>
+  {/if}
+
   <div class="preview">
     <div class="pv-pool">
       <span class="pv-num" use:pulse={totalPool}>{totalPool}</span>
@@ -207,6 +222,7 @@
         specBonus ? `${specBonus} spec` : "",
         modifier ? `${modifier < 0 ? "−" : "+"}${Math.abs(modifier)}` : "",
         resonance ? `${resonance} reso` : "",
+        impairPenalty ? `−2 impaired` : "",
         surge ? `${surge} surge` : "",
       ].filter(Boolean).join(" + ")}
       · <b class="hunger">{hungerDice}</b> Hunger · {difficulty > 0 ? `DC ${difficulty}` : "count successes"}
@@ -465,6 +481,19 @@
   }
   .reso-toggle.on span i {
     color: color-mix(in srgb, var(--gl-gold, #c8a86b) 80%, var(--gl-ink));
+  }
+
+  /* Impairment toggle: a penalty, so it reads as a blood-red alert. */
+  .impair-toggle {
+    border-color: var(--gl-blood);
+    background: color-mix(in srgb, var(--gl-blood) 8%, transparent);
+  }
+  .impair-toggle.on span {
+    color: var(--gl-blood-bright);
+    font-weight: 600;
+  }
+  .impair-toggle.on span i {
+    color: var(--gl-blood);
   }
 
   /* Dice tray — one stone per die, so the pool has a physical weight. Normal

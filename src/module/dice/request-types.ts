@@ -69,6 +69,13 @@ export interface RequestState {
   };
   targets: RequestTarget[];
   cancelled: boolean;
+  /**
+   * How a successes tie resolves (contested mode). V5: ties go to the
+   * defender/resister — usually the opposition — so "opposition" is the
+   * default; old messages without the field behave the same. "none" keeps
+   * the neutral tie for symmetric contests (e.g. a footrace).
+   */
+  tieBreak?: "opposition" | "target" | "none";
 }
 
 /** Message flags shape: flags[SYSTEM_ID] = { card: "request", request: RequestState } */
@@ -98,7 +105,25 @@ export interface RequestFulfilledPayload {
   deviation?: string;
 }
 
-export type RequestSocketPayload = RequestFulfilledPayload;
+/**
+ * Player → GM: apply weapon damage to an actor the player does not own. Carries
+ * the RAW damage; mitigation (vampire halving, armor) is computed by whichever
+ * client actually writes the actor, so it always sees the target's real sheet.
+ */
+export interface ApplyDamagePayload {
+  type: "applyDamage";
+  targetActorUuid: string;
+  /** Raw incoming superficial damage (before halving/armor). */
+  superficial: number;
+  /** Raw incoming aggravated damage. */
+  aggravated: number;
+  /** e.g. the weapon or attacker name, for the applied-damage chat note. */
+  sourceName?: string;
+  /** ChatMessage id of the roll card the damage came from. */
+  sourceMessageId?: string;
+}
+
+export type RequestSocketPayload = RequestFulfilledPayload | ApplyDamagePayload;
 
 /* --------------------------------------------------- contract signatures
  *

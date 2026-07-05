@@ -24,12 +24,28 @@
   const items = $derived(snap.items as any[]);
   const isGhoul = $derived(doc.type === "ghoul");
 
+  // Permission gates (see VampireSheet for the mechanism).
+  const editable = $derived(snap.editable as boolean);
+  const limited = $derived(snap.limited as boolean);
+
+  // Resolve the linked regnant actor (if any) so we can show a portrait + link.
+  const regnant = $derived.by(() => {
+    const uuid = sys.bloodBond?.regnantUuid;
+    if (!uuid) return null;
+    try {
+      return (foundry.utils as any)?.fromUuidSync?.(uuid) ?? (globalThis as any).fromUuidSync?.(uuid) ?? null;
+    } catch {
+      return null;
+    }
+  });
+
   const disciplines = $derived(items.filter((i) => i.type === "discipline"));
   const advantages = $derived(items.filter((i) => i.type === "advantage"));
   const equipment = $derived(items.filter((i) => ["weapon", "armor", "gear"].includes(i.type)));
 
   let dragOver = $state(false);
   let editMode = $state(false);
+  const edit = $derived(editMode && editable);
   let expanded: Record<string, boolean> = $state({});
   const reveal = (key: string) => (expanded[key] = !expanded[key]);
 
@@ -38,9 +54,13 @@
   const EDIT_TICKER = "EDIT MODE · ".repeat(24);
 
   function up(path: string, value: unknown) {
+    if (!editable) return;
     doc.update({ [path]: value });
   }
-  const upItem = (id: string, path: string, value: unknown) => doc.items.get(id)?.update({ [path]: value });
+  const upItem = (id: string, path: string, value: unknown) => {
+    if (!editable) return;
+    doc.items.get(id)?.update({ [path]: value });
+  };
   const bumpStain = (d: number) =>
     up("system.humanity.stains", Math.max(0, Math.min(10, (sys.humanity.stains ?? 0) + d)));
   const setHumanity = (i: number) => up("system.humanity.value", sys.humanity.value === i + 1 ? i : i + 1);
@@ -53,44 +73,86 @@
     dragOver = false;
     app.glHandleDrop?.(event);
   }
+
+  const setDrinks = (i: number) => up("system.bloodBond.drinks", (sys.bloodBond?.drinks ?? 0) === i + 1 ? i : i + 1);
+
+  function openRegnant() {
+    (regnant as any)?.sheet?.render(true);
+  }
+
+  // Drop an Actor from the sidebar onto the bond panel to link the regnant.
+  function onRegnantDrop(event: DragEvent) {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!editable) return;
+    let data: any = {};
+    try {
+      data = JSON.parse(event.dataTransfer?.getData("text/plain") ?? "{}");
+    } catch {
+      data = {};
+    }
+    if (data?.type === "Actor" && data.uuid) {
+      up("system.bloodBond.regnantUuid", data.uuid);
+    }
+  }
 </script>
 
 <div
   class="gl-mortal"
   class:dragover={dragOver}
-  class:editing={editMode}
+  class:editing={edit}
   role="region"
   aria-label="{prettify(doc.type)} sheet"
   ondragover={(e) => (e.preventDefault(), (dragOver = true))}
   ondragleave={() => (dragOver = false)}
   ondrop={onDrop}
 >
-  {#if editMode}
+  {#if limited}
+    <header class="hdr">
+      <div class="spine"></div>
+      <Portrait img={snap.img} name={snap.name} />
+      <div class="hdr-main">
+        <div class="eyebrow">{isGhoul ? "Ghoul · Blood-Bound" : "Mortal"} · World of Darkness</div>
+        <div class="name">{snap.name}</div>
+      </div>
+    </header>
+    <div class="foot">
+      <div class="sect-h">Biography</div>
+      {#if sys.biography}
+        <div class="bio-html">{@html sys.biography}</div>
+      {:else}
+        <p class="empty">No biography recorded.</p>
+      {/if}
+    </div>
+  {:else}
+  {#if edit}
     <div class="edit-marquee top" aria-hidden="true">
       <div class="edit-marquee-track"><span>{EDIT_TICKER}</span><span>{EDIT_TICKER}</span></div>
     </div>
   {/if}
   <header class="hdr">
     <div class="spine"></div>
-    <Portrait img={snap.img} name={snap.name} editable={editMode} onedit={() => pickImage(doc)} />
+    <Portrait img={snap.img} name={snap.name} editable={edit} onedit={() => pickImage(doc)} />
     <div class="hdr-main">
       <div class="hdr-top">
         <div class="idblock">
           <div class="eyebrow">{isGhoul ? "Ghoul · Blood-Bound" : "Mortal"} · World of Darkness</div>
-          <input class="name" value={snap.name} disabled={!editMode} onchange={(e) => doc.update({ name: e.currentTarget.value })} />
+          <input class="name" value={snap.name} disabled={!edit} onchange={(e) => doc.update({ name: e.currentTarget.value })} />
         </div>
         <div class="hdr-tools">
-          <button class="mode-toggle" class:on={editMode} onclick={() => (editMode = !editMode)} title="Toggle play / edit">
-            {editMode ? "🔓 Edit" : "🔒 Play"}
-          </button>
-          <button class="roll-cta" onclick={openPool} title="Build a dice pool">Roll Pool</button>
+          {#if editable}
+            <button class="mode-toggle" class:on={editMode} onclick={() => (editMode = !editMode)} title="Toggle play / edit">
+              {editMode ? "🔓 Edit" : "🔒 Play"}
+            </button>
+            <button class="roll-cta" onclick={openPool} title="Build a dice pool">Roll Pool</button>
+          {/if}
         </div>
       </div>
       <div class="hdr-sub">
         {#each [["details.concept", "Concept"], ["details.ambition", "Ambition"], ["details.desire", "Desire"]] as const as [path, lbl] (path)}
           <label class="sub">
             <span class="mini-lbl">{lbl}</span>
-            <input value={path.split(".").reduce((o: any, k) => o?.[k], sys)} disabled={!editMode} onchange={(e) => up(`system.${path}`, e.currentTarget.value)} />
+            <input value={path.split(".").reduce((o: any, k) => o?.[k], sys)} disabled={!edit} onchange={(e) => up(`system.${path}`, e.currentTarget.value)} />
           </label>
         {/each}
       </div>
@@ -100,11 +162,11 @@
   <div class="body">
     <section class="left">
       <div class="sect-h">Attributes</div>
-      <AttributeGrid attributes={sys.attributes} readonly={!editMode} onrate={(k, n) => up(`system.attributes.${k}.value`, n)} onroll={rollAttr} />
+      <AttributeGrid attributes={sys.attributes} readonly={!edit} onrate={(k, n) => up(`system.attributes.${k}.value`, n)} onroll={rollAttr} />
       <div class="sect-h">Skills</div>
       <SkillGrid
         skills={sys.skills}
-        readonly={!editMode}
+        readonly={!edit}
         onrate={(k, n) => up(`system.skills.${k}.value`, n)}
         onspec={(k, list) => up(`system.skills.${k}.specialties`, list)}
         onroll={rollSkill}
@@ -118,7 +180,8 @@
           superficial={sys.health.superficial}
           aggravated={sys.health.aggravated}
           max={sys.health.max}
-          onchange={(v) => doc.update({ "system.health.superficial": v.superficial, "system.health.aggravated": v.aggravated })}
+          disabled={!editable}
+          onchange={(v) => editable && doc.update({ "system.health.superficial": v.superficial, "system.health.aggravated": v.aggravated })}
         />
       </div>
       <div class="trk">
@@ -127,7 +190,8 @@
           superficial={sys.willpower.superficial}
           aggravated={sys.willpower.aggravated}
           max={sys.willpower.max}
-          onchange={(v) => doc.update({ "system.willpower.superficial": v.superficial, "system.willpower.aggravated": v.aggravated })}
+          disabled={!editable}
+          onchange={(v) => editable && doc.update({ "system.willpower.superficial": v.superficial, "system.willpower.aggravated": v.aggravated })}
         />
       </div>
 
@@ -136,11 +200,13 @@
       <div class="trk">
         <div class="trk-h">
           <span class="l">Humanity</span>
-          <span class="stainctl">
-            Stains
-            <button class="mini-btn" onclick={() => bumpStain(-1)} aria-label="Decrease stains">–</button>
-            <button class="mini-btn" onclick={() => bumpStain(1)} aria-label="Increase stains">+</button>
-          </span>
+          {#if editable}
+            <span class="stainctl">
+              Stains
+              <button class="mini-btn" onclick={() => bumpStain(-1)} aria-label="Decrease stains">–</button>
+              <button class="mini-btn" onclick={() => bumpStain(1)} aria-label="Increase stains">+</button>
+            </span>
+          {/if}
         </div>
         <div class="humanity">
           {#each Array.from({ length: 10 }, (_, i) => i) as i (i)}
@@ -156,24 +222,85 @@
             ></span>
           {/each}
         </div>
+        {#if sys.humanityImpaired}
+          <div class="impair-badge" title="Stains overlap remaining Humanity">
+            Impaired — stains overlap Humanity (−2 dice)
+          </div>
+        {/if}
       </div>
 
       {#if isGhoul}
         <div class="rail-div"></div>
         <div class="trk">
           <div class="trk-h"><span class="l blood">Vitae</span></div>
-          <DotRating value={sys.vitae ?? 0} max={10} size={12} color="blood" readonly={!editMode} onchange={(n) => up("system.vitae", n)} />
+          <DotRating value={sys.vitae ?? 0} max={10} size={12} color="blood" readonly={!edit} onchange={(n) => up("system.vitae", n)} />
         </div>
-        <div class="trk">
+
+        <!-- Blood Bond panel: drop an Actor here to link the regnant. -->
+        <section
+          class="bond"
+          class:droppable={edit}
+          ondragover={(e) => edit && e.preventDefault()}
+          ondrop={onRegnantDrop}
+          role="group"
+          aria-label="Blood Bond"
+        >
+          <div class="trk-h"><span class="l blood">Blood Bond</span></div>
+
+          {#if regnant}
+            <button class="regnant-card" onclick={openRegnant} title="Open {(regnant as any).name}'s sheet">
+              <img class="regnant-img" src={(regnant as any).img} alt="" onerror={(e) => ((e.currentTarget as HTMLImageElement).style.visibility = "hidden")} />
+              <span class="regnant-meta">
+                <span class="regnant-lbl">Regnant (Domitor)</span>
+                <span class="regnant-name">{(regnant as any).name}</span>
+              </span>
+              {#if edit}
+                <span
+                  class="regnant-clear"
+                  role="button"
+                  tabindex="0"
+                  title="Unlink regnant"
+                  aria-label="Unlink regnant"
+                  onclick={(e) => (e.stopPropagation(), up("system.bloodBond.regnantUuid", ""))}
+                  onkeydown={(e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), e.stopPropagation(), up("system.bloodBond.regnantUuid", ""))}
+                >✕</span>
+              {/if}
+            </button>
+          {:else if edit}
+            <p class="bond-hint">Drop an Actor here to link the regnant.</p>
+          {/if}
+
           <label class="ghoul-f">
             <span class="mini-lbl">Regnant (Domitor)</span>
-            <input value={sys.bloodBond?.regnant ?? ""} disabled={!editMode} onchange={(e) => up("system.bloodBond.regnant", e.currentTarget.value)} />
+            <input value={sys.bloodBond?.regnant ?? ""} disabled={!edit} placeholder="Name" onchange={(e) => up("system.bloodBond.regnant", e.currentTarget.value)} />
           </label>
+
           <div class="trk-h" style="margin-top:8px">
-            <span class="l">Blood Bond</span>
-            <DotRating value={sys.bloodBond?.rating ?? 0} max={6} size={11} color="blood" readonly={!editMode} onchange={(n) => up("system.bloodBond.rating", n)} />
+            <span class="l">Bond Rating</span>
+            <DotRating value={sys.bloodBond?.rating ?? 0} max={6} size={11} color="blood" readonly={!edit} onchange={(n) => up("system.bloodBond.rating", n)} />
           </div>
-        </div>
+
+          <div class="drinks">
+            <span class="mini-lbl">Drinks this cycle</span>
+            <span class="pips">
+              {#each [0, 1, 2] as i (i)}
+                <span
+                  class="pip"
+                  class:on={i < (sys.bloodBond?.drinks ?? 0)}
+                  role="button"
+                  tabindex="0"
+                  aria-label={`Drinks ${i + 1}`}
+                  onclick={() => setDrinks(i)}
+                  onkeydown={(e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), setDrinks(i))}
+                ></span>
+              {/each}
+            </span>
+          </div>
+
+          <p class="bond-note">
+            A ghoul must drink vitae at least once a month or begin aging; the bond fades after (7 − rating) months without drinking.
+          </p>
+        </section>
       {/if}
     </aside>
   </div>
@@ -183,14 +310,14 @@
       <section class="panel brd">
         <div class="sect-h with-add">
           Disciplines
-          {#if editMode}<button class="add-btn" onclick={() => createItem(doc, "discipline")}>+ Add</button>{/if}
+          {#if edit}<button class="add-btn" onclick={() => createItem(doc, "discipline")}>+ Add</button>{/if}
         </div>
         {#if disciplines.length === 0}<p class="empty">Ghouls may hold a dot or two.</p>{/if}
         {#each disciplines as d (d.id)}
           <div class="line gl-row" data-item-id={d.id}>
             <span class="line-name">{d.name}</span>
-            <DotRating value={d.system.value} max={5} size={13} readonly={!editMode} onchange={(n) => upItem(d.id, "system.value", n)} />
-            {#if editMode}<ItemControls onedit={() => editItem(doc, d.id)} ondelete={() => deleteItem(doc, d.id)} />{/if}
+            <DotRating value={d.system.value} max={5} size={13} readonly={!edit} onchange={(n) => upItem(d.id, "system.value", n)} />
+            {#if edit}<ItemControls onedit={() => editItem(doc, d.id)} ondelete={() => deleteItem(doc, d.id)} />{/if}
           </div>
         {/each}
       </section>
@@ -199,14 +326,14 @@
     <section class="panel brd">
       <div class="sect-h with-add">
         Advantages &amp; Flaws
-        {#if editMode}<button class="add-btn" onclick={() => createItem(doc, "advantage")}>+ Add</button>{/if}
+        {#if edit}<button class="add-btn" onclick={() => createItem(doc, "advantage")}>+ Add</button>{/if}
       </div>
       {#if advantages.length === 0}<p class="empty">Merits, Flaws &amp; Backgrounds.</p>{/if}
       {#each advantages as a (a.id)}
         <div class="line gl-row" data-item-id={a.id}>
           <span class="line-name" class:flaw={a.system.kind === "flaw"}><b>{a.name}</b> <i>· {prettify(a.system.kind)}</i></span>
-          <DotRating value={a.system.value} max={a.system.maxValue || 5} size={13} readonly={!editMode} onchange={(n) => upItem(a.id, "system.value", n)} />
-          {#if editMode}<ItemControls onedit={() => editItem(doc, a.id)} ondelete={() => deleteItem(doc, a.id)} />{/if}
+          <DotRating value={a.system.value} max={a.system.maxValue || 5} size={13} readonly={!edit} onchange={(n) => upItem(a.id, "system.value", n)} />
+          {#if edit}<ItemControls onedit={() => editItem(doc, a.id)} ondelete={() => deleteItem(doc, a.id)} />{/if}
         </div>
       {/each}
     </section>
@@ -214,7 +341,7 @@
     <section class="panel">
       <div class="sect-h with-add">
         Equipment
-        {#if editMode}
+        {#if edit}
           <span class="add-group">
             <button class="add-btn" onclick={() => createItem(doc, "weapon")}>+ Weapon</button>
             <button class="add-btn" onclick={() => createItem(doc, "gear")}>+ Gear</button>
@@ -225,10 +352,10 @@
       {#each equipment as g (g.id)}
         <div class="line gl-row" data-item-id={g.id}>
           <button class="line-name reveal" onclick={() => reveal(g.id)} title="Show detail"><b>{g.name}</b> <i>· {prettify(g.type)}</i></button>
-          {#if g.type === "weapon"}
+          {#if g.type === "weapon" && editable}
             <button class="mini-roll" onclick={() => rollWeapon(doc, g)} title="Roll {g.name}" aria-label="Roll">⚄</button>
           {/if}
-          {#if editMode}<ItemControls onedit={() => editItem(doc, g.id)} ondelete={() => deleteItem(doc, g.id)} />{/if}
+          {#if edit}<ItemControls onedit={() => editItem(doc, g.id)} ondelete={() => deleteItem(doc, g.id)} />{/if}
         </div>
         {#if expanded[g.id]}
           <div class="detail" transition:slide={{ duration: 150 }}>
@@ -255,18 +382,31 @@
   </div>
 
   <div class="foot">
-    <div class="sect-h">Biography</div>
-    <textarea rows="5" value={sys.biography} onchange={(e) => up("system.biography", e.currentTarget.value)}></textarea>
+    <button class="sect-h collapse" onclick={() => reveal("bio")} aria-expanded={expanded["bio"] ?? false}>
+      Biography <span class="chev">{expanded["bio"] ? "▾" : "▸"}</span>
+    </button>
+    {#if expanded["bio"]}
+      <div class="bio-body" transition:slide={{ duration: 150 }}>
+        {#if edit}
+          <textarea rows="8" value={sys.biography} onchange={(e) => up("system.biography", e.currentTarget.value)}></textarea>
+        {:else if sys.biography}
+          <div class="bio-html">{@html sys.biography}</div>
+        {:else}
+          <p class="empty">No biography yet. Switch to Edit mode to write one.</p>
+        {/if}
+      </div>
+    {/if}
   </div>
 
   <div class="foot">
-    <EffectsPanel {doc} {snap} />
+    <EffectsPanel {doc} {snap} {editable} />
   </div>
 
-  {#if editMode}
+  {#if edit}
     <div class="edit-marquee bottom" aria-hidden="true">
       <div class="edit-marquee-track"><span>{EDIT_TICKER}</span><span>{EDIT_TICKER}</span></div>
     </div>
+  {/if}
   {/if}
 </div>
 
@@ -745,5 +885,167 @@
     background: var(--gl-parch-raise);
     padding: 8px;
     resize: vertical;
+  }
+
+  /* Humanity impairment warning badge. */
+  .impair-badge {
+    margin-top: 8px;
+    font-family: var(--gl-cond);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-size: 9px;
+    font-weight: 600;
+    color: var(--gl-parch);
+    background: var(--gl-blood);
+    border: 1px solid var(--gl-blood);
+    padding: 3px 7px;
+    line-height: 1.3;
+  }
+
+  /* Blood Bond panel. */
+  .bond {
+    margin-bottom: 20px;
+    padding: 10px;
+    margin-left: -10px;
+    margin-right: -10px;
+    border: 1px solid transparent;
+  }
+  .bond.droppable {
+    border: 1px dashed var(--gl-line);
+    border-radius: 3px;
+  }
+  .bond.droppable:hover {
+    border-color: var(--gl-blood);
+  }
+  .regnant-card {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    text-align: left;
+    padding: 5px;
+    margin-bottom: 8px;
+    background: var(--gl-parch-raise);
+    border: 1px solid var(--gl-line);
+    border-left: 2px solid var(--gl-blood);
+    cursor: pointer;
+    font: inherit;
+    color: inherit;
+    position: relative;
+  }
+  .regnant-card:hover {
+    border-color: var(--gl-blood);
+  }
+  .regnant-img {
+    width: 34px;
+    height: 34px;
+    object-fit: cover;
+    border: 1px solid var(--gl-line);
+    flex: none;
+  }
+  .regnant-meta {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+  .regnant-lbl {
+    font-family: var(--gl-cond);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-size: 8px;
+    color: var(--gl-muted);
+  }
+  .regnant-name {
+    font-family: var(--gl-semi);
+    font-weight: 600;
+    font-size: 13px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .regnant-clear {
+    margin-left: auto;
+    color: var(--gl-muted);
+    font-size: 12px;
+    line-height: 1;
+    padding: 2px 4px;
+    cursor: pointer;
+  }
+  .regnant-clear:hover {
+    color: var(--gl-blood);
+  }
+  .bond-hint {
+    font-family: var(--gl-cond);
+    font-size: 10px;
+    letter-spacing: 1px;
+    color: var(--gl-muted);
+    font-style: italic;
+    margin: 0 0 8px;
+  }
+  .drinks {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 8px;
+  }
+  .pips {
+    display: inline-flex;
+    gap: 5px;
+  }
+  .pip {
+    width: 13px;
+    height: 13px;
+    border: 1.5px solid var(--gl-blood);
+    border-radius: 50%;
+    cursor: pointer;
+    box-sizing: border-box;
+    background: transparent;
+    transition: background 0.14s ease;
+  }
+  .pip.on {
+    background: var(--gl-blood);
+  }
+  .pip:hover {
+    border-color: var(--gl-blood-bright);
+  }
+  .pip:focus-visible {
+    outline: 2px solid var(--gl-blood);
+    outline-offset: 1px;
+  }
+  .bond-note {
+    margin: 10px 0 0;
+    font-size: 10px;
+    line-height: 1.4;
+    color: var(--gl-muted);
+    font-style: italic;
+  }
+
+  /* Collapsible biography. */
+  .sect-h.collapse {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    background: transparent;
+    cursor: pointer;
+    text-align: left;
+  }
+  .sect-h.collapse .chev {
+    font-size: 11px;
+    color: var(--gl-muted);
+  }
+  .sect-h.collapse:hover {
+    color: var(--gl-blood-bright);
+  }
+  .bio-body {
+    margin-top: 12px;
+  }
+  .bio-html {
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--gl-ink);
+  }
+  .bio-html :global(p) {
+    margin: 0 0 8px;
   }
 </style>

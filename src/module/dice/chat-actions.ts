@@ -9,10 +9,28 @@
 import { SYSTEM_ID } from "../config.ts";
 import type { V5RollResult } from "./roll-v5.ts";
 import { willpowerReroll, rollPool } from "./roll-v5.ts";
-import { rollCardHTML, renderDiceTooltip, postRollCard } from "./chat.ts";
+import {
+  rollCardHTML,
+  renderDiceTooltip,
+  postRollCard,
+  weaponDamageTotal,
+  compulsionEligible,
+} from "./chat.ts";
+import type { WeaponRollInfo } from "./chat.ts";
+import {
+  GENERAL_COMPULSIONS,
+  clanCompulsionInfo,
+  generalCompulsion,
+  type CompulsionInfo,
+} from "../vtm/clans.ts";
 import { openRollDialog } from "../apps/RollDialogApp.ts";
 import { disciplineRating } from "./pool.ts";
-import type { RequestState, RequestPoolSpec } from "./request-types.ts";
+import type {
+  RequestState,
+  RequestPoolSpec,
+  ApplyDamagePayload,
+} from "./request-types.ts";
+import { SOCKET_NAME } from "./request-types.ts";
 import * as request from "./request.ts";
 
 const MAX_WP_REROLL = 3;
@@ -151,6 +169,8 @@ async function performWillpowerReroll(
     diceTooltip,
     bloodSurge: !!flags.bloodSurge,
     note,
+    weapon: flags.weapon as WeaponRollInfo | undefined,
+    showCompulsion: compulsionEligible(actor, redo.result),
   });
 
   // Edit the original message in place; append the re-roll's dice to its rolls.
@@ -195,10 +215,184 @@ async function markWillpowerCost(actor: any): Promise<void> {
   await actor.update({ "system.willpower.superficial": superficial + 1 });
 }
 
+/* --------------------------------------------------------- damage pipeline */
+
+function escHTML(s: string): string {
+  return foundry.utils.escapeHTML?.(s) ?? String(s);
+}
+
+/**
+ * "Apply Damage" on a weapon roll card: compute the V5 damage total (margin +
+ * weapon rating, min 1) and route it to the user's current targets. Mitigation
+ * (vampire halving, armor) happens on the applying client, which can always
+ * read the target's real sheet.
+ */
+async function onApplyDamage(message: any, button: HTMLElement): Promise<void> {
+  const flags = message.flags?.[SYSTEM_ID] ?? {};
+  const result = flags.result as V5RollResult | undefined;
+  const weapon = flags.weapon as WeaponRollInfo | undefined;
+  if (!result || !weapon || !result.won) return;
+
+  const targets = [...(((game as any).user?.targets ?? []) as Set<any>)];
+  if (targets.length === 0) {
+    (ui as any).notifications?.warn?.(
+      "Target a token first, then click Apply Damage.",
+    );
+    return;
+  }
+
+  (button as HTMLButtonElement).disabled = true;
+  try {
+    const total = weaponDamageTotal(result, weapon);
+    const superficial = weapon.damageType === "superficial" ? total : 0;
+    const aggravated = weapon.damageType === "aggravated" ? total : 0;
+    for (const token of targets) {
+      const actor = token?.actor;
+      if (!actor) continue;
+      await routeApplyDamage({
+        type: "applyDamage",
+        targetActorUuid: actor.uuid,
+        superficial,
+        aggravated,
+        sourceName: weapon.name,
+        sourceMessageId: message.id,
+      });
+    }
+  } catch (err) {
+    console.error(`${SYSTEM_ID} | apply damage failed`, err);
+  } finally {
+    (button as HTMLButtonElement).disabled = false;
+  }
+}
+
+/**
+ * Route a damage payload to a client that may write the target: apply directly
+ * when this user is a GM or owns the actor; otherwise emit for the active-GM
+ * client (same single-writer pattern as request fulfilment).
+ */
+export async function routeApplyDamage(payload: ApplyDamagePayload): Promise<void> {
+  // A player without permission gets null from fromUuid — that's the emit path.
+  const actor: any = await fromUuid(payload.targetActorUuid).catch(() => null);
+  if (actor && (isGM() || actor.isOwner)) {
+    await applyDamageToActor(actor, payload);
+    return;
+  }
+  if (!(game as any).users?.activeGM) {
+    (ui as any).notifications?.warn?.(
+      "No active Storyteller online to apply damage to that target.",
+    );
+    return;
+  }
+  (game as any).socket?.emit(SOCKET_NAME, payload);
+}
+
+/**
+ * Apply raw incoming damage to an actor per V5:
+ * - Vampires (and Hunger-bearing SPCs) halve superficial damage, rounding up.
+ * - Equipped armor then reduces superficial damage by its rating (aggravated
+ *   damage is NOT reduced by armor in this simple pass).
+ * - Superficial fills empty boxes; once the track is full, further superficial
+ *   converts existing superficial boxes to aggravated one-for-one.
+ * Posts a public chat note describing what landed.
+ */
+export async function applyDamageToActor(
+  actor: any,
+  dmg: { superficial: number; aggravated: number; sourceName?: string },
+): Promise<void> {
+  const mitigation: string[] = [];
+  let superficial = Math.max(0, Math.floor(dmg.superficial ?? 0));
+  const aggravated = Math.max(0, Math.floor(dmg.aggravated ?? 0));
+
+  // V5: vampires halve superficial damage from most sources, rounding up.
+  // SPCs with a Hunger rating are treated as vampire-like.
+  const vampiric =
+    actor.type === "vampire" ||
+    (actor.type === "spc" && (actor.system?.hunger ?? 0) > 0);
+  if (vampiric && superficial > 0) {
+    const before = superficial;
+    superficial = Math.ceil(superficial / 2);
+    mitigation.push(`halved from ${before}`);
+  }
+
+  const armor = actor.items?.find?.(
+    (i: any) => i.type === "armor" && i.system?.equipped,
+  );
+  const rating = Math.max(0, armor?.system?.rating ?? 0);
+  if (rating > 0 && superficial > 0) {
+    const absorbed = Math.min(rating, superficial);
+    superficial -= absorbed;
+    mitigation.push(`armor ${absorbed}`);
+  }
+
+  const notes: string[] = [];
+  const health = actor.system?.health;
+
+  if (typeof health === "number") {
+    // SPCs track health as a flat pool of boxes; no superficial/aggravated
+    // split, so just knock boxes off.
+    const next = Math.max(0, health - superficial - aggravated);
+    await actor.update({ "system.health": next });
+    if (next === 0) notes.push("Torpor/death threshold reached.");
+  } else if (health && typeof health === "object") {
+    const max = Math.max(0, health.max ?? 0);
+    let agg = Math.min(Math.max(0, health.aggravated ?? 0), max);
+    let sup = Math.min(Math.max(0, health.superficial ?? 0), max - agg);
+
+    // Aggravated fills the track directly (displacing superficial if full).
+    agg = Math.min(max, agg + aggravated);
+    sup = Math.min(sup, max - agg);
+
+    // Superficial fills empty boxes; overflow converts superficial one-for-one.
+    const fill = Math.min(superficial, max - agg - sup);
+    sup += fill;
+    const convert = Math.min(superficial - fill, sup);
+    sup -= convert;
+    agg = Math.min(max, agg + convert);
+
+    await actor.update({
+      "system.health.superficial": sup,
+      "system.health.aggravated": agg,
+    });
+    if (max > 0 && agg >= max) notes.push("Torpor/death threshold reached.");
+  } else {
+    return; // no health track (e.g. coterie) — nothing to apply
+  }
+
+  const parts: string[] = [];
+  if (superficial > 0) parts.push(`${superficial} superficial`);
+  if (aggravated > 0) parts.push(`${aggravated} aggravated`);
+  const amount = parts.length ? `${parts.join(" and ")} damage` : "no damage";
+  const mit = mitigation.length ? ` (${mitigation.join(", ")})` : "";
+  const from = dmg.sourceName ? ` — ${escHTML(dmg.sourceName)}` : "";
+  const extra = notes.length
+    ? `<div class="gl-dmg-threshold">${notes.map(escHTML).join(" ")}</div>`
+    : "";
+  await ChatMessage.create({
+    speaker: ChatMessage.getSpeaker({ actor }),
+    content: `<div class="gl-card gl-damage-note">
+      <span class="gl-dmg-line">${escHTML(actor.name ?? "—")} takes ${amount}${escHTML(mit)}${from}</span>
+      ${extra}
+    </div>`,
+    flags: { [SYSTEM_ID]: { card: "damage" } },
+  });
+}
+
 function onAction(message: any, button: HTMLElement): void {
   switch (button.dataset.glAction) {
     case "wp-reroll":
       onWillpowerReroll(message, button);
+      break;
+    case "apply-damage":
+      void onApplyDamage(message, button);
+      break;
+    case "compulsion":
+      void onCompulsion(message);
+      break;
+    case "compulsion-pick":
+      void onCompulsionPick(message, button);
+      break;
+    case "compulsion-resolve":
+      void onCompulsionResolve(message);
       break;
     case "request-roll":
       void onRequestRoll(message, button);
@@ -210,6 +404,233 @@ function onAction(message: any, button: HTMLElement): void {
       void onRequestCancel(message);
       break;
   }
+}
+
+/* ----------------------------------------------------------- compulsion flow */
+
+const COMPULSION_STATUS = "compulsion";
+
+/**
+ * Compulsion state stored on a compulsion chat card's flags: the actor it
+ * targets, and once picked, the chosen Compulsion.
+ */
+interface CompulsionCardFlags {
+  card: "compulsion";
+  actorUuid: string;
+  actorName: string;
+  img?: string;
+  clan?: string;
+  chosen?: CompulsionInfo;
+}
+
+/** Compulsion choices for an actor: the four general ones plus its clan's. */
+function compulsionOptions(clan: string | undefined): CompulsionInfo[] {
+  const list = [...GENERAL_COMPULSIONS];
+  const clanOne = clan ? clanCompulsionInfo(clan) : undefined;
+  if (clanOne) list.push(clanOne);
+  return list;
+}
+
+/** Whether the current user may act on a compulsion card (owner or GM). */
+function canManageCompulsion(actor: any): boolean {
+  return isGM() || !!actor?.isOwner;
+}
+
+/** Build the option-selection body of a compulsion card. */
+function compulsionSelectHTML(f: CompulsionCardFlags): string {
+  const portrait = f.img
+    ? `<img class="gl-card-portrait" src="${escHTML(f.img)}" alt="" onerror="this.style.display='none'"/>`
+    : "";
+  const options = compulsionOptions(f.clan)
+    .map(
+      (c) => `
+      <button type="button" class="gl-act gl-compulsion-opt" data-gl-action="compulsion-pick"
+        data-compulsion-id="${escHTML(c.id)}">
+        <span class="gl-compulsion-name">${escHTML(c.name)}</span>
+        <span class="gl-compulsion-sum">${escHTML(c.summary)}</span>
+      </button>`,
+    )
+    .join("");
+  return `
+  <div class="gl-card gl-compulsion" data-outcome="bestial">
+    <div class="gl-card-head">
+      ${portrait}
+      <div class="gl-card-id">
+        <span class="gl-card-actor">${escHTML(f.actorName)}</span>
+        <span class="gl-card-flavor">Compulsion</span>
+      </div>
+    </div>
+    <div class="gl-card-detail">The Beast stirs — choose a Compulsion to impose.</div>
+    <div class="gl-compulsion-opts">${options}</div>
+  </div>`;
+}
+
+/** Build the resolved body of a compulsion card (chosen Compulsion + resolve). */
+function compulsionChosenHTML(f: CompulsionCardFlags): string {
+  const c = f.chosen!;
+  const portrait = f.img
+    ? `<img class="gl-card-portrait" src="${escHTML(f.img)}" alt="" onerror="this.style.display='none'"/>`
+    : "";
+  return `
+  <div class="gl-card gl-compulsion gl-compulsion-active" data-outcome="bestial">
+    <div class="gl-card-head">
+      ${portrait}
+      <div class="gl-card-id">
+        <span class="gl-card-actor">${escHTML(f.actorName)}</span>
+        <span class="gl-card-flavor">Compulsion — ${escHTML(c.name)}</span>
+      </div>
+    </div>
+    <div class="gl-compulsion-body">
+      <span class="gl-compulsion-name">${escHTML(c.name)}</span>
+      <span class="gl-compulsion-sum">${escHTML(c.summary)}</span>
+    </div>
+    <div class="gl-card-actions">
+      <button type="button" class="gl-act" data-gl-action="compulsion-resolve">Resolve Compulsion</button>
+    </div>
+  </div>`;
+}
+
+/** Build the cleared body of a compulsion card (after Resolve). */
+function compulsionResolvedHTML(f: CompulsionCardFlags): string {
+  const c = f.chosen;
+  const portrait = f.img
+    ? `<img class="gl-card-portrait" src="${escHTML(f.img)}" alt="" onerror="this.style.display='none'"/>`
+    : "";
+  return `
+  <div class="gl-card gl-compulsion gl-compulsion-done" data-outcome="success">
+    <div class="gl-card-head">
+      ${portrait}
+      <div class="gl-card-id">
+        <span class="gl-card-actor">${escHTML(f.actorName)}</span>
+        <span class="gl-card-flavor">Compulsion — ${escHTML(c?.name ?? "")}</span>
+      </div>
+    </div>
+    <div class="gl-card-detail">Compulsion satisfied — the Beast is quieted.</div>
+  </div>`;
+}
+
+/** "Compulsion…" on a roll card: post a public compulsion-selection card. */
+async function onCompulsion(message: any): Promise<void> {
+  const flags = message.flags?.[SYSTEM_ID] ?? {};
+  const actorUuid = flags.actorUuid as string | undefined;
+  if (!actorUuid) return;
+  const actor: any = await fromUuid(actorUuid).catch(() => null);
+  if (!actor) return;
+  if (!canManageCompulsion(actor)) return;
+  if (actor.type !== "vampire") return;
+
+  const cardFlags: CompulsionCardFlags = {
+    card: "compulsion",
+    actorUuid,
+    actorName: actor.name ?? "—",
+    img: actor.img,
+    clan: actor.system?.clan as string | undefined,
+  };
+  try {
+    await ChatMessage.create({
+      speaker: ChatMessage.getSpeaker({ actor }),
+      content: compulsionSelectHTML(cardFlags),
+      flags: { [SYSTEM_ID]: cardFlags },
+    });
+  } catch (err) {
+    console.error(`${SYSTEM_ID} | post compulsion card failed`, err);
+  }
+}
+
+/** Read a compulsion card's flags. */
+function readCompulsionFlags(message: any): CompulsionCardFlags | undefined {
+  const flags = message.flags?.[SYSTEM_ID];
+  if (flags?.card !== "compulsion") return undefined;
+  return flags as CompulsionCardFlags;
+}
+
+/**
+ * An owner/GM picks a Compulsion: resolve its data, apply the status + actor
+ * flag, and rewrite the card to show the chosen Compulsion with a Resolve
+ * affordance.
+ */
+async function onCompulsionPick(message: any, button: HTMLElement): Promise<void> {
+  const f = readCompulsionFlags(message);
+  if (!f || f.chosen) return;
+  const actor: any = await fromUuid(f.actorUuid).catch(() => null);
+  if (!actor || !canManageCompulsion(actor)) return;
+
+  const id = button.dataset.compulsionId;
+  if (!id) return;
+  const chosen = id.startsWith("clan:")
+    ? clanCompulsionInfo(id.slice("clan:".length))
+    : generalCompulsion(id);
+  if (!chosen) return;
+
+  try {
+    await applyCompulsion(actor, chosen);
+    const next: CompulsionCardFlags = { ...f, chosen };
+    await message.update({
+      content: compulsionChosenHTML(next),
+      [`flags.${SYSTEM_ID}.chosen`]: chosen,
+    });
+  } catch (err) {
+    console.error(`${SYSTEM_ID} | apply compulsion failed`, err);
+  }
+}
+
+/** Resolve a compulsion: clear the status + flag and mark the card done. */
+async function onCompulsionResolve(message: any): Promise<void> {
+  const f = readCompulsionFlags(message);
+  if (!f) return;
+  const actor: any = await fromUuid(f.actorUuid).catch(() => null);
+  if (!actor || !canManageCompulsion(actor)) return;
+
+  try {
+    await clearCompulsion(actor);
+    await message.update({ content: compulsionResolvedHTML(f) });
+  } catch (err) {
+    console.error(`${SYSTEM_ID} | resolve compulsion failed`, err);
+  }
+}
+
+/**
+ * Apply a Compulsion to an actor: set the `compulsion` status effect on its
+ * token/prototype and store the chosen Compulsion in a system flag. Uses the
+ * v13 `Actor#toggleStatusEffect` API (not in the shim — cast to `any`).
+ */
+async function applyCompulsion(actor: any, chosen: CompulsionInfo): Promise<void> {
+  await actor.setFlag(SYSTEM_ID, "compulsion", chosen);
+  try {
+    if (typeof actor.toggleStatusEffect === "function") {
+      await actor.toggleStatusEffect(COMPULSION_STATUS, { active: true });
+    }
+  } catch (err) {
+    console.warn(`${SYSTEM_ID} | could not set compulsion status`, err);
+  }
+}
+
+/** Remove the Compulsion status effect and flag from an actor. */
+async function clearCompulsion(actor: any): Promise<void> {
+  try {
+    if (typeof actor.toggleStatusEffect === "function") {
+      await actor.toggleStatusEffect(COMPULSION_STATUS, { active: false });
+    }
+  } catch (err) {
+    console.warn(`${SYSTEM_ID} | could not clear compulsion status`, err);
+  }
+  await actor.unsetFlag(SYSTEM_ID, "compulsion");
+}
+
+/**
+ * Bind-time gating for a compulsion card: option / resolve buttons are live only
+ * for the actor's owner or the GM; everyone else sees them disabled.
+ */
+function gateCompulsionButtons(message: any, root: HTMLElement): void {
+  const f = readCompulsionFlags(message);
+  if (!f) return;
+  const actor = fromUuidSync(f.actorUuid) as any;
+  if (canManageCompulsion(actor)) return;
+  root
+    .querySelectorAll<HTMLElement>(
+      '[data-gl-action="compulsion-pick"], [data-gl-action="compulsion-resolve"]',
+    )
+    .forEach((btn) => disableWaiting(btn));
 }
 
 /* ------------------------------------------------------- request card actions */
@@ -360,6 +781,7 @@ function bind(message: any, root: HTMLElement): void {
   // Request cards gate their buttons per viewer before listeners are wired
   // (this may remove the cancel button for non-GMs).
   if (message.flags?.[SYSTEM_ID]?.card === "request") gateRequestButtons(message, root);
+  if (message.flags?.[SYSTEM_ID]?.card === "compulsion") gateCompulsionButtons(message, root);
   root.querySelectorAll<HTMLElement>("[data-gl-action]").forEach((btn) => {
     // Both render hooks can fire for one message on v13; bind each button once.
     if (btn.dataset.glBound) return;

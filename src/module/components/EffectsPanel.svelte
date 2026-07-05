@@ -7,8 +7,9 @@
   interface Props {
     doc: any;
     snap: any;
+    editable?: boolean;
   }
-  let { doc, snap }: Props = $props();
+  let { doc, snap, editable = false }: Props = $props();
 
   const effects = $derived(snap.effects ?? []);
 </script>
@@ -16,11 +17,11 @@
 <section class="gl-effects">
   <div class="sect-h with-add">
     Active Effects
-    <button class="add-btn" onclick={() => createEffect(doc)}>+ Add</button>
+    {#if editable}<button class="add-btn" onclick={() => createEffect(doc)}>+ Add</button>{/if}
   </div>
 
   {#if effects.length === 0}
-    <p class="empty">No active effects. Add one to modify traits, tracks, or pools.</p>
+    <p class="empty">No active effects{#if editable}. Add one to modify traits, tracks, or pools{/if}.</p>
   {/if}
 
   {#each effects as fx (fx.id)}
@@ -29,13 +30,14 @@
         class="toggle"
         title={fx.disabled ? "Enable" : "Disable"}
         aria-label={fx.disabled ? "Enable" : "Disable"}
-        onclick={() => toggleEffect(doc, fx.id)}
+        disabled={!editable}
+        onclick={() => editable && toggleEffect(doc, fx.id)}
       >
         <img src={fx.img} alt="" />
       </button>
-      <button class="fx-name" onclick={() => editEffect(doc, fx.id)}>{fx.name}</button>
+      <button class="fx-name" disabled={!editable} onclick={() => editable && editEffect(doc, fx.id)}>{fx.name}</button>
       <span class="count" title="Number of changes">{fx.changes.length}</span>
-      <ItemControls onedit={() => editEffect(doc, fx.id)} ondelete={() => deleteEffect(doc, fx.id)} />
+      {#if editable}<ItemControls onedit={() => editEffect(doc, fx.id)} ondelete={() => deleteEffect(doc, fx.id)} />{/if}
     </div>
   {/each}
 </section>

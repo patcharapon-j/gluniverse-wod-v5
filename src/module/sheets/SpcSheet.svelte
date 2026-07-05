@@ -16,12 +16,18 @@
 
   const sys = $derived(snap.system);
 
+  // Permission gates (see VampireSheet for the mechanism).
+  const editable = $derived(snap.editable as boolean);
+  const limited = $derived(snap.limited as boolean);
+
   function up(path: string, value: unknown) {
+    if (!editable) return;
     doc.update({ [path]: value });
   }
 
   // Roll a flat pool (SPC blocks quote a single dice number, not attr + skill).
   async function rollFlat(pool: number, flavor: string) {
+    if (!editable) return;
     const p = Math.max(0, pool);
     if (p === 0) return;
     const { result, roll } = await rollPool({ pool: p, hunger: sys.hunger ?? 0 });
@@ -61,13 +67,24 @@
 </script>
 
 <div class="gl-spc">
+  {#if limited}
+    <header class="hdr">
+      <div class="spine"></div>
+      <Portrait img={snap.img} name={snap.name} />
+      <div class="hdr-id">
+        <div class="eyebrow">Antagonist · Storyteller Character</div>
+        <div class="name">{snap.name}</div>
+        {#if sys.archetype}<div class="archetype">{sys.archetype}</div>{/if}
+      </div>
+    </header>
+  {:else}
   <header class="hdr">
     <div class="spine"></div>
-    <Portrait img={snap.img} name={snap.name} editable onedit={() => pickImage(doc)} />
+    <Portrait img={snap.img} name={snap.name} editable={editable} onedit={() => editable && pickImage(doc)} />
     <div class="hdr-id">
       <div class="eyebrow">Antagonist · Storyteller Character</div>
-      <input class="name" value={snap.name} onchange={(e) => doc.update({ name: e.currentTarget.value })} />
-      <input class="archetype" placeholder="Archetype / concept…" value={sys.archetype} onchange={(e) => up("system.archetype", e.currentTarget.value)} />
+      <input class="name" value={snap.name} disabled={!editable} onchange={(e) => editable && doc.update({ name: e.currentTarget.value })} />
+      <input class="archetype" placeholder="Archetype / concept…" value={sys.archetype} disabled={!editable} onchange={(e) => up("system.archetype", e.currentTarget.value)} />
     </div>
   </header>
 
@@ -76,22 +93,26 @@
       <div class="sect-h">Attribute Pools</div>
       {#each POOLS as [key, lbl] (key)}
         <div class="pool-row">
-          <button class="pool-name" title="Roll {lbl}" onclick={() => rollFlat(sys.attributePools?.[key] ?? 0, lbl)}>{lbl}</button>
-          <input class="num" type="number" min="0" value={sys.attributePools?.[key] ?? 0} onchange={(e) => up(`system.attributePools.${key}`, Number(e.currentTarget.value))} />
+          {#if editable}
+            <button class="pool-name" title="Roll {lbl}" onclick={() => rollFlat(sys.attributePools?.[key] ?? 0, lbl)}>{lbl}</button>
+          {:else}
+            <span class="pool-name">{lbl}</span>
+          {/if}
+          <input class="num" type="number" min="0" value={sys.attributePools?.[key] ?? 0} disabled={!editable} onchange={(e) => up(`system.attributePools.${key}`, Number(e.currentTarget.value))} />
         </div>
       {/each}
 
       <div class="sect-h with-add">
         Standard Pools
-        <button class="add-btn" onclick={addPool}>+ Add</button>
+        {#if editable}<button class="add-btn" onclick={addPool}>+ Add</button>{/if}
       </div>
-      {#if (sys.standardPools ?? []).length === 0}<p class="empty">Add named pools (e.g. Mesmerize 7).</p>{/if}
+      {#if (sys.standardPools ?? []).length === 0}<p class="empty">Named pools (e.g. Mesmerize 7).</p>{/if}
       {#each sys.standardPools ?? [] as p, i (i)}
         <div class="pool-row gl-row">
-          <button class="pool-roll" title="Roll {p.label}" onclick={() => rollFlat(p.value, p.label)} aria-label="Roll">⚄</button>
-          <input class="pool-lbl" value={p.label} onchange={(e) => editPool(i, "label", e.currentTarget.value)} />
-          <input class="num" type="number" min="0" value={p.value} onchange={(e) => editPool(i, "value", Number(e.currentTarget.value))} />
-          <button class="del" onclick={() => delPool(i)} aria-label="Remove">✕</button>
+          {#if editable}<button class="pool-roll" title="Roll {p.label}" onclick={() => rollFlat(p.value, p.label)} aria-label="Roll">⚄</button>{/if}
+          <input class="pool-lbl" value={p.label} disabled={!editable} onchange={(e) => editPool(i, "label", e.currentTarget.value)} />
+          <input class="num" type="number" min="0" value={p.value} disabled={!editable} onchange={(e) => editPool(i, "value", Number(e.currentTarget.value))} />
+          {#if editable}<button class="del" onclick={() => delPool(i)} aria-label="Remove">✕</button>{/if}
         </div>
       {/each}
     </section>
@@ -101,20 +122,21 @@
       {#each [["health", "Health"], ["willpower", "Willpower"], ["humanity", "Humanity"], ["hunger", "Hunger"]] as const as [key, lbl] (key)}
         <label class="stat">
           <span>{lbl}</span>
-          <input type="number" min="0" value={sys[key]} onchange={(e) => up(`system.${key}`, Number(e.currentTarget.value))} />
+          <input type="number" min="0" value={sys[key]} disabled={!editable} onchange={(e) => up(`system.${key}`, Number(e.currentTarget.value))} />
         </label>
       {/each}
 
       <div class="sect-h with-add">
         Disciplines
-        <button class="add-btn" onclick={addDisc}>+ Add</button>
+        {#if editable}<button class="add-btn" onclick={addDisc}>+ Add</button>{/if}
       </div>
       {#if (sys.disciplines ?? []).length === 0}<p class="empty">None.</p>{/if}
       {#each sys.disciplines ?? [] as d, i (i)}
         <div class="disc-row gl-row">
-          <input class="disc-name" value={d.name} onchange={(e) => editDisc(i, "name", e.currentTarget.value)} />
-          <DotRating value={d.value} max={5} size={10} onchange={(n) => editDisc(i, "value", n)} />
-          <button class="del" onclick={() => delDisc(i)} aria-label="Remove">✕</button>
+          {#if editable}<button class="pool-roll" title="Roll {d.name}" onclick={() => rollFlat(d.value, d.name)} aria-label="Roll">⚄</button>{/if}
+          <input class="disc-name" value={d.name} disabled={!editable} onchange={(e) => editDisc(i, "name", e.currentTarget.value)} />
+          <DotRating value={d.value} max={5} size={10} readonly={!editable} onchange={(n) => editDisc(i, "value", n)} />
+          {#if editable}<button class="del" onclick={() => delDisc(i)} aria-label="Remove">✕</button>{/if}
         </div>
       {/each}
     </aside>
@@ -122,12 +144,19 @@
 
   <div class="foot">
     <div class="sect-h">Notes</div>
-    <textarea rows="5" value={sys.notes} onchange={(e) => up("system.notes", e.currentTarget.value)}></textarea>
+    {#if editable}
+      <textarea rows="5" value={sys.notes} onchange={(e) => up("system.notes", e.currentTarget.value)}></textarea>
+    {:else if sys.notes}
+      <div class="notes-ro">{sys.notes}</div>
+    {:else}
+      <p class="empty">No notes.</p>
+    {/if}
   </div>
 
   <div class="foot">
-    <EffectsPanel {doc} {snap} />
+    <EffectsPanel {doc} {snap} {editable} />
   </div>
+  {/if}
 </div>
 
 <style>
@@ -338,5 +367,11 @@
     background: var(--gl-parch-raise);
     padding: 8px;
     resize: vertical;
+  }
+  .notes-ro {
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--gl-ink);
+    white-space: pre-wrap;
   }
 </style>

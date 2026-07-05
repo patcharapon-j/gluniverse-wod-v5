@@ -11,6 +11,7 @@
   "TYPES.Item.power": "Power",
   "TYPES.Item.ritual": "Ritual",
   "TYPES.Item.ceremony": "Ceremony",
+  "TYPES.Item.formula": "Formula",
   "TYPES.Item.advantage": "Advantage",
   "TYPES.Item.weapon": "Weapon",
   "TYPES.Item.armor": "Armor",
@@ -110,6 +111,12 @@
   "GLUNIVERSE.Generation": "Generation",
   "GLUNIVERSE.Desperation": "Desperation",
   "GLUNIVERSE.Danger": "Danger",
+
+  "GLUNIVERSE.Feeding.bagged": "Bagged / Cold Blood",
+  "GLUNIVERSE.Feeding.animal": "Animal",
+  "GLUNIVERSE.Feeding.humanSip": "Sip from a Human",
+  "GLUNIVERSE.Feeding.humanHarmful": "Harmful Drink from a Human",
+  "GLUNIVERSE.Feeding.humanKill": "Drain & Kill a Human",
 
   "GLUNIVERSE.Conditions.Frenzy": "Frenzy",
   "GLUNIVERSE.Conditions.Terror": "Terror",

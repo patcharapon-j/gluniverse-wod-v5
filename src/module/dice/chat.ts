@@ -69,6 +69,37 @@ function diceRow(result: V5RollResult): string {
   return `<div class="gl-dice">${chips}</div>`;
 }
 
+/** Weapon context threaded through a roll's flags for the damage pipeline. */
+export interface WeaponRollInfo {
+  id?: string;
+  name: string;
+  /** Weapon damage rating (added to the margin on a win). */
+  damage: number;
+  damageType: "superficial" | "aggravated";
+}
+
+/**
+ * V5 damage inflicted by a winning attack roll: margin (successes − difficulty)
+ * plus the weapon's damage rating, minimum 1 on any win. At difficulty 0
+ * (open-ended) the margin is simply the success total.
+ */
+export function weaponDamageTotal(result: V5RollResult, weapon: WeaponRollInfo): number {
+  if (!result.won) return 0;
+  return Math.max(1, result.margin + Math.max(0, weapon.damage));
+}
+
+/**
+ * Whether a roll result warrants offering a Compulsion for a given actor: the
+ * actor must be a vampire and the outcome a Bestial Failure, potential Bestial
+ * Failure (open-ended win with a Hunger 1), or Messy Critical.
+ */
+export function compulsionEligible(actor: any, result: V5RollResult): boolean {
+  if (actor?.type !== "vampire") return false;
+  const potentialBestial =
+    result.difficulty <= 0 && result.won && result.hungerOnes > 0;
+  return result.bestial || result.messy || potentialBestial;
+}
+
 export interface RollCardOptions {
   actorName: string;
   img?: string;
@@ -82,6 +113,10 @@ export interface RollCardOptions {
   note?: string;
   /** Human note when the rolled pool deviated from a request's asked pool. */
   deviation?: string;
+  /** Weapon context — a winning roll shows a damage summary + Apply Damage. */
+  weapon?: WeaponRollInfo;
+  /** Vampire actor on a bestial/messy outcome — offer the Compulsion button. */
+  showCompulsion?: boolean;
 }
 
 /** Build the roll-card body (the message content Foundry wraps in its chrome). */
@@ -110,6 +145,37 @@ export function rollCardHTML(opts: RollCardOptions): string {
   const portrait = opts.img
     ? `<img class="gl-card-portrait" src="${esc(opts.img)}" alt="" onerror="this.style.display='none'"/>`
     : "";
+
+  // Weapon rolls that won show the V5 damage line (margin + weapon rating).
+  let damageBlock = "";
+  const showDamage = !!opts.weapon && result.won;
+  if (opts.weapon && showDamage) {
+    const dmg = weaponDamageTotal(result, opts.weapon);
+    damageBlock = `
+    <div class="gl-card-damage">
+      <span class="gl-dmg-total"><b>${dmg}</b> ${esc(opts.weapon.damageType)} damage</span>
+      <span class="gl-dmg-calc">margin ${result.margin} + ${esc(opts.weapon.name)} ${opts.weapon.damage}${result.margin + opts.weapon.damage < 1 ? " (min 1)" : ""}</span>
+    </div>`;
+  }
+
+  const actionButtons: string[] = [];
+  if (canReroll) {
+    actionButtons.push(
+      `<button type="button" class="gl-act" data-gl-action="wp-reroll">Willpower Re-roll</button>`,
+    );
+  }
+  if (showDamage) {
+    actionButtons.push(
+      `<button type="button" class="gl-act" data-gl-action="apply-damage">Apply Damage</button>`,
+    );
+  }
+  // On a Bestial Failure, potential Bestial Failure, or Messy Critical the
+  // Storyteller may impose a Compulsion (vampires only).
+  if (opts.showCompulsion) {
+    actionButtons.push(
+      `<button type="button" class="gl-act gl-act-compulsion" data-gl-action="compulsion">Compulsion…</button>`,
+    );
+  }
 
   return `
   <div class="gl-card ${opts.bloodSurge ? "gl-surge" : ""}" data-outcome="${result.outcome}">
@@ -140,6 +206,8 @@ export function rollCardHTML(opts: RollCardOptions): string {
       ${result.messy ? `<span class="gl-bane-note">Messy</span>` : ""}
     </div>
 
+    ${damageBlock}
+
     ${opts.note ? `<div class="gl-card-detail">${esc(opts.note)}</div>` : ""}
 
     ${opts.deviation ? `<div class="gl-card-detail"><em>⚠ ${esc(opts.deviation)}</em></div>` : ""}
@@ -151,10 +219,8 @@ export function rollCardHTML(opts: RollCardOptions): string {
     }
 
     ${
-      canReroll
-        ? `<div class="gl-card-actions">
-             <button type="button" class="gl-act" data-gl-action="wp-reroll">Willpower Re-roll</button>
-           </div>`
+      actionButtons.length
+        ? `<div class="gl-card-actions">${actionButtons.join("\n             ")}</div>`
         : ""
     }
   </div>`;
@@ -184,11 +250,14 @@ export async function postRollCard(
     deviation?: string;
     /** Force the card public regardless of the user's chat roll-mode. */
     forcePublic?: boolean;
+    /** Weapon context: shows the damage summary + Apply Damage on a win. */
+    weapon?: WeaponRollInfo;
   } = {},
 ): Promise<any> {
   const flavor = opts.flavor ?? "Roll";
   const img = actor?.img;
   const diceTooltip = await renderDiceTooltip(roll);
+  const showCompulsion = compulsionEligible(actor, result);
   const content = rollCardHTML({
     actorName: actor?.name ?? "—",
     img,
@@ -198,6 +267,8 @@ export async function postRollCard(
     bloodSurge: opts.bloodSurge,
     note: opts.note,
     deviation: opts.deviation,
+    weapon: opts.weapon,
+    showCompulsion,
   });
   const data: Record<string, any> = {
     speaker: ChatMessage.getSpeaker({ actor }),
@@ -214,6 +285,7 @@ export async function postRollCard(
         bloodSurge: !!opts.bloodSurge,
         requestMessageId: opts.requestMessageId,
         deviation: opts.deviation,
+        weapon: opts.weapon,
       },
     },
   };
