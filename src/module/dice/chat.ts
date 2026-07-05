@@ -26,37 +26,50 @@ function esc(s: string): string {
   return foundry.utils.escapeHTML?.(s) ?? String(s);
 }
 
+/** Which system die a chip renders as: regular pool, Hunger, or Rouse. */
+type DieChipKind = "regular" | "hunger" | "rouse";
+
 /**
- * One die chip: hunger vs regular, glyph faces for successes/crits/banes.
+ * One die chip: regular / Hunger / Rouse, glyph faces for successes/crits/banes.
  * Glyphs are CSS-masked `<i>` elements (Foundry sanitizes chat HTML and strips
  * inline `<svg>`); the mask images are the same SVG files the Dice So Nice
  * presets use, coloured by the chip's `currentColor`.
  */
-function dieChip(value: number, hunger: boolean, rerolled = false, index?: number): string {
+function dieChip(value: number, kind: DieChipKind, rerolled = false, index?: number): string {
   const cls = ["gl-die"];
-  if (hunger) cls.push("hunger");
+  if (kind !== "regular") cls.push(kind);
   let face: string | null = null;
-  if (value === 10) {
+  if (kind === "rouse") {
+    // A Rouse check has no crit or bane — every success face wears the same
+    // heart-and-bolt glyph, mirroring the physical die.
+    if (value >= 6) {
+      cls.push("hit");
+      face = "gl-face-rouse";
+    } else {
+      cls.push("miss");
+    }
+  } else if (value === 10) {
     cls.push("crit");
-    face = hunger ? "gl-face-messy" : "gl-face-crit";
+    face = kind === "hunger" ? "gl-face-messy" : "gl-face-crit";
   } else if (value >= 6) {
     cls.push("hit");
     face = "gl-face-mark";
-  } else if (hunger && value === 1) {
+  } else if (kind === "hunger" && value === 1) {
     cls.push("bane");
     face = "gl-face-bestial";
   } else {
     cls.push("miss");
   }
   if (rerolled) cls.push("rerolled");
-  const title = `${hunger ? "Hunger die" : "Die"}: ${value}${rerolled ? " — Willpower re-roll" : ""}`;
+  const kindLabel = kind === "hunger" ? "Hunger die" : kind === "rouse" ? "Rouse die" : "Die";
+  const title = `${kindLabel}: ${value}${rerolled ? " — Willpower re-roll" : ""}`;
   // Failure faces are blank like the real dice; the value stays as the corner
   // numeral and the tooltip.
   const body = `${face ? `<i class="gl-face ${face}"></i>` : ""}<em>${value}</em>`;
   // Regular dice carry their pool index so the Willpower re-roll can offer
-  // click-to-select; Hunger dice may never be re-rolled (V5 core).
+  // click-to-select; Hunger and Rouse dice may never be re-rolled (V5 core).
   const data =
-    index !== undefined && !hunger ? ` data-die-index="${index}"` : "";
+    index !== undefined && kind === "regular" ? ` data-die-index="${index}"` : "";
   // `--gl-i` staggers the entrance animation (see gluniverse-wod.css).
   const stagger = index !== undefined ? ` style="--gl-i:${index}"` : "";
   return `<span class="${cls.join(" ")}" title="${title}"${data}${stagger}>${body}</span>`;
@@ -64,7 +77,7 @@ function dieChip(value: number, hunger: boolean, rerolled = false, index?: numbe
 
 function diceRow(result: V5RollResult): string {
   const chips = result.dice
-    .map((d, i) => dieChip(d.value, d.hunger, d.rerolled, i))
+    .map((d, i) => dieChip(d.value, d.hunger ? "hunger" : "regular", d.rerolled, i))
     .join("");
   return `<div class="gl-dice">${chips}</div>`;
 }
@@ -310,9 +323,26 @@ export interface CheckCardData {
   img?: string;
 }
 
+/**
+ * Resolve once Dice So Nice has finished animating a message's roll — or
+ * immediately when DSN is absent. Callers hold visible actor mutations on this
+ * so trackers (Hunger, Humanity) can't spoil a result mid-tumble.
+ */
+export async function waitForDiceAnimation(message: any): Promise<void> {
+  const dice3d = (game as any).dice3d;
+  if (!dice3d?.waitFor3DAnimationByMessageID || !message?.id) return;
+  try {
+    await dice3d.waitFor3DAnimationByMessageID(message.id);
+  } catch {
+    // Never let a hiccup in the animation strand the roll's bookkeeping.
+  }
+}
+
 /** Post a single-purpose check (Rouse / Remorse / Frenzy) card. */
-export async function postCheckCard(actor: any, data: CheckCardData): Promise<void> {
-  const chips = data.dice.map((v, i) => dieChip(v, data.kind === "rouse", false, i)).join("");
+export async function postCheckCard(actor: any, data: CheckCardData): Promise<any> {
+  const chips = data.dice
+    .map((v, i) => dieChip(v, data.kind === "rouse" ? "rouse" : "regular", false, i))
+    .join("");
   const diceTooltip = await renderDiceTooltip(data.roll);
   const img = data.img ?? actor?.img;
   const portrait = img
@@ -334,7 +364,7 @@ export async function postCheckCard(actor: any, data: CheckCardData): Promise<vo
     <div class="gl-card-detail">${esc(data.detail)}</div>
     ${diceTooltip ? `<details class="gl-card-breakdown"><summary>Dice</summary>${diceTooltip}</details>` : ""}
   </div>`;
-  await ChatMessage.create({
+  return await ChatMessage.create({
     speaker: ChatMessage.getSpeaker({ actor }),
     content,
     rolls: [data.roll],
