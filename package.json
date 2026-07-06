@@ -1,6 +1,6 @@
 {
   "name": "gluniverse-wod-v5",
-  "version": "1.5.3",
+  "version": "1.5.4",
   "description": "A modern, unofficial Foundry VTT game system for the World of Darkness 5th Edition family of games.",
   "type": "module",
   "private": true,
