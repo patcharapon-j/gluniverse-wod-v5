@@ -6,8 +6,11 @@
  * bone with blood-red glyphs for Rouse, so a Rouse check is unmistakable next to
  * Hunger dice. Faces carry dedicated soft-beveled bump maps for relief (see
  * build-dice-icons.mjs) and the crisp glyph as an emissive map on the faces that
- * matter: the 10 on regular dice, the 1 and 10 on Hunger dice, every success
- * face (6+) on Rouse dice. No-op when Dice So Nice isn't installed.
+ * matter: every success face (6+) and the 10 on regular dice, the 1 and 10 on
+ * Hunger dice, every success face (6+) on Rouse dice. Regular dice glow white —
+ * white glyph textures under a white emissive — so success and crit read as a
+ * cool highlight against the gold face glyphs. No-op when Dice So Nice isn't
+ * installed.
  */
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -61,15 +64,22 @@ function bumpMaps(kind: DieKind): (string | undefined)[] {
 }
 
 /**
- * Emission only on the faces that matter: 10 regular; 1 and 10 Hunger; every
- * success face on Rouse (the only question a Rouse check asks). Uses the crisp
- * glyph (not the blurred bump map) so the glow stays sharp.
+ * Emission only on the faces that matter: every success (6+) and the 10 on
+ * regular dice; 1 and 10 Hunger; every success face on Rouse (the only question
+ * a Rouse check asks). Uses the crisp glyph (not the blurred bump map) so the
+ * glow stays sharp. Regular dice emit the *white* glyph variants so, paired with
+ * a white emissive, the glow reads white rather than gold.
  */
 function emissiveMaps(kind: DieKind): (string | undefined)[] {
   if (kind === "rouse") return glyphsOnly(labels(kind));
   const out: (string | undefined)[] = new Array(10).fill(undefined);
-  out[9] = ICON(kind === "hunger" ? "messy" : "crit-gold");
-  if (kind === "hunger") out[0] = ICON("bestial");
+  if (kind === "regular") {
+    for (let n = 6; n <= 9; n++) out[n - 1] = ICON("mark");
+    out[9] = ICON("crit");
+    return out;
+  }
+  out[9] = ICON("messy");
+  out[0] = ICON("bestial");
   return out;
 }
 
@@ -91,7 +101,9 @@ export function registerDiceSoNice(): void {
         texture: "none",
         material: "resin",
         font: "Oswald",
-        emissive: "#d4af37",
+        // White glow on the emissive success/crit glyphs; intensity unchanged
+        // from the original crit face (0.14).
+        emissive: "#ffffff",
         emissiveIntensity: 0.14,
       });
 
@@ -137,7 +149,7 @@ export function registerDiceSoNice(): void {
           labels: labels("regular"),
           bumpMaps: bumpMaps("regular"),
           emissiveMaps: emissiveMaps("regular"),
-          emissive: "#d4af37",
+          emissive: "#ffffff",
           system: SYSTEM_ID,
           colorset: "gl-vampire",
         },
