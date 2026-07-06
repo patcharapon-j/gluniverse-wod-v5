@@ -6,8 +6,11 @@
  * bone with blood-red glyphs for Rouse, so a Rouse check is unmistakable next to
  * Hunger dice. Faces carry dedicated soft-beveled bump maps for relief (see
  * build-dice-icons.mjs) and the crisp glyph as an emissive map on the faces that
- * matter: the 10 on regular dice, the 1 and 10 on Hunger dice, every success
- * face (6+) on Rouse dice. No-op when Dice So Nice isn't installed.
+ * matter: every success (6+) and the 10 on regular dice, the 1 and 10 on Hunger
+ * dice, every success face (6+) on Rouse dice. Regular dice glow gold; the crit
+ * (10) emits at full intensity and the successes at half — baked into the
+ * emissive textures (a dimmed gold glyph on the success faces), since DSN exposes
+ * only one intensity per die. No-op when Dice So Nice isn't installed.
  */
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -61,15 +64,23 @@ function bumpMaps(kind: DieKind): (string | undefined)[] {
 }
 
 /**
- * Emission only on the faces that matter: 10 regular; 1 and 10 Hunger; every
- * success face on Rouse (the only question a Rouse check asks). Uses the crisp
- * glyph (not the blurred bump map) so the glow stays sharp.
+ * Emission only on the faces that matter: every success (6+) and the 10 on
+ * regular dice; 1 and 10 Hunger; every success face on Rouse (the only question
+ * a Rouse check asks). Uses the crisp glyph (not the blurred bump map) so the
+ * glow stays sharp. Regular successes emit the *dimmed* gold glyph, half as
+ * bright as the crit — DSN has one emissiveIntensity per die, so the crit/success
+ * ratio is baked into the textures rather than set per face.
  */
 function emissiveMaps(kind: DieKind): (string | undefined)[] {
   if (kind === "rouse") return glyphsOnly(labels(kind));
   const out: (string | undefined)[] = new Array(10).fill(undefined);
-  out[9] = ICON(kind === "hunger" ? "messy" : "crit-gold");
-  if (kind === "hunger") out[0] = ICON("bestial");
+  if (kind === "regular") {
+    for (let n = 6; n <= 9; n++) out[n - 1] = ICON("mark-gold-dim");
+    out[9] = ICON("crit-gold");
+    return out;
+  }
+  out[9] = ICON("messy");
+  out[0] = ICON("bestial");
   return out;
 }
 
@@ -91,8 +102,10 @@ export function registerDiceSoNice(): void {
         texture: "none",
         material: "resin",
         font: "Oswald",
+        // Crit face glows gold at this intensity (~20% up from the old 0.14);
+        // success faces glow at half via the dimmed emissive glyph (mark-gold-dim).
         emissive: "#d4af37",
-        emissiveIntensity: 0.14,
+        emissiveIntensity: 0.168,
       });
 
       dice3d.addColorset({
