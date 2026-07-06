@@ -1315,6 +1315,10 @@
   }
   .lvl-blurb {
     flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
     font-size: 11.5px;
     font-style: italic;
     color: var(--gl-muted-2);
