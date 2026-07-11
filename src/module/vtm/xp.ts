@@ -19,7 +19,8 @@ export type XpCategory =
   | "ceremony"
   | "formula"
   | "advantage"
-  | "bloodPotency";
+  | "bloodPotency"
+  | "ghoulPower";
 
 /** Cost to raise `category` from `current` to `current + 1` dots. */
 export function xpCost(category: XpCategory, current: number): number {
@@ -46,14 +47,19 @@ export function xpCost(category: XpCategory, current: number): number {
       return next * 3;
     case "bloodPotency":
       return next * 10;
+    case "ghoulPower":
+      return 10;
     default:
       return next * 5;
   }
 }
 
-/** Pick the right Discipline category for a clan (Caitiff/Thin-blood → caitiff rate). */
+/** Pick the RAW Discipline rate, including Thin-Blood Alchemy/Affinity exceptions. */
 export function disciplineCategory(clan: string, discipline: string): XpCategory {
-  if (clan === "caitiff" || clan === "thinBlood") return "disciplineCaitiff";
+  if (clan === "caitiff") return "disciplineCaitiff";
+  if (clan === "thinBlood") {
+    return discipline === "thinBloodAlchemy" ? "disciplineInClan" : "disciplineOutClan";
+  }
   return inClanDisciplines(clan).includes(discipline as Discipline)
     ? "disciplineInClan"
     : "disciplineOutClan";
@@ -71,4 +77,18 @@ export const XP_CATEGORY_LABEL: Record<XpCategory, string> = {
   formula: "Thin-Blood Formula",
   advantage: "Advantage",
   bloodPotency: "Blood Potency",
+  ghoulPower: "Ghoul Discipline Power",
 };
+
+/** RAW Blood Potency ceiling for a vampire's generation. */
+export function maxBloodPotency(generation: number, thinBlood = false): number {
+  if (thinBlood || generation >= 14) return 0;
+  if (generation >= 12) return 3;
+  if (generation >= 10) return 4;
+  if (generation === 9) return 5;
+  if (generation === 8) return 6;
+  if (generation === 7) return 7;
+  if (generation === 6) return 8;
+  if (generation === 5) return 9;
+  return 10;
+}

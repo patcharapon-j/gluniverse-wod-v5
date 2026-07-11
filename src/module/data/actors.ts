@@ -10,6 +10,28 @@ import { CLANS, PREDATOR_TYPES, RESONANCES, RESONANCE_INTENSITIES, BLOOD_POTENCY
 import { int, str, html, bool, schema, arr } from "./fields.ts";
 import { attributesField, skillsField, detailsField, trackField, deriveTrack } from "./common.ts";
 
+/** Durable audit record for a single XP purchase (including later undo/respec). */
+const xpHistoryField = (): any =>
+  arr(
+    schema({
+      id: str(),
+      category: str(),
+      label: str(),
+      cost: int(0, { min: 0 }),
+      targetKind: str(),
+      targetId: str(),
+      path: str(),
+      before: str(),
+      after: str(),
+      createdAt: str(),
+      undone: bool(false),
+      undoneAt: str(),
+    }),
+  );
+
+const xpField = (): any =>
+  schema({ value: int(0, { min: 0 }), total: int(0, { min: 0 }), history: xpHistoryField() });
+
 /**
  * Derive Humanity-vs-Stains overlap. In V5, when Stains fill boxes that overlap
  * the character's remaining Humanity (stains > 10 − humanity) the character is
@@ -61,7 +83,7 @@ export class VampireData extends (foundry.abstract.TypeDataModel as any) {
         }),
       ),
       details: detailsField(),
-      xp: schema({ value: int(0, { min: 0 }), total: int(0, { min: 0 }) }),
+      xp: xpField(),
       convictions: arr(schema({ conviction: str(), touchstone: str() })),
       biography: html(),
     };
@@ -93,7 +115,7 @@ export class MortalData extends (foundry.abstract.TypeDataModel as any) {
       willpower: trackField(),
       humanity: schema({ value: int(7, { min: 0, max: 10 }), stains: int(0, { min: 0, max: 10 }) }),
       details: detailsField(),
-      xp: schema({ value: int(0, { min: 0 }), total: int(0, { min: 0 }) }),
+      xp: xpField(),
       biography: html(),
     };
   }
@@ -125,7 +147,7 @@ export class GhoulData extends (foundry.abstract.TypeDataModel as any) {
       }),
       vitae: int(0, { min: 0, max: 10 }),
       details: detailsField(),
-      xp: schema({ value: int(0, { min: 0 }), total: int(0, { min: 0 }) }),
+      xp: xpField(),
       biography: html(),
     };
   }

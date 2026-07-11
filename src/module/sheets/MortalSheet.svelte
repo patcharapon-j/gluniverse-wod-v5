@@ -11,6 +11,7 @@
   import { createItem, editItem, deleteItem } from "../apps/actor-items.ts";
   import { openRollDialog, rollWeapon } from "../apps/RollDialogApp.ts";
   import { pickImage } from "../apps/image.ts";
+  import { openXpDialog } from "../apps/XpDialogApp.ts";
 
   /* eslint-disable @typescript-eslint/no-explicit-any */
   interface Props {
@@ -40,6 +41,7 @@
   });
 
   const disciplines = $derived(items.filter((i) => i.type === "discipline"));
+  const powersFor = (discipline: any) => items.filter((i) => i.type === "power" && i.system.discipline === discipline.system.discipline);
   const advantages = $derived(items.filter((i) => i.type === "advantage"));
   const equipment = $derived(items.filter((i) => ["weapon", "armor", "gear"].includes(i.type)));
 
@@ -141,6 +143,7 @@
         </div>
         <div class="hdr-tools">
           {#if editable}
+            <button class="mode-toggle" onclick={() => openXpDialog(doc)} title="Spend and review experience">{sys.xp?.value ?? 0} XP</button>
             <button class="mode-toggle" class:on={editMode} onclick={() => (editMode = !editMode)} title="Toggle play / edit">
               {editMode ? "🔓 Edit" : "🔒 Play"}
             </button>
@@ -155,6 +158,14 @@
             <input value={path.split(".").reduce((o: any, k) => o?.[k], sys)} disabled={!edit} onchange={(e) => up(`system.${path}`, e.currentTarget.value)} />
           </label>
         {/each}
+        <label class="sub">
+          <span class="mini-lbl">Unspent XP</span>
+          <input type="number" min="0" value={sys.xp?.value ?? 0} disabled={!edit} onchange={(e) => up("system.xp.value", Number(e.currentTarget.value))} />
+        </label>
+        <label class="sub">
+          <span class="mini-lbl">Total XP</span>
+          <input type="number" min="0" value={sys.xp?.total ?? 0} disabled={!edit} onchange={(e) => up("system.xp.total", Number(e.currentTarget.value))} />
+        </label>
       </div>
     </div>
   </header>
@@ -319,6 +330,12 @@
             <DotRating value={d.system.value} max={5} size={13} readonly={!edit} onchange={(n) => upItem(d.id, "system.value", n)} />
             {#if edit}<ItemControls onedit={() => editItem(doc, d.id)} ondelete={() => deleteItem(doc, d.id)} />{/if}
           </div>
+          {#each powersFor(d) as power (power.id)}
+            <div class="line ghoul-power gl-row" data-item-id={power.id}>
+              <span class="line-name">↳ {power.name}</span>
+              {#if edit}<ItemControls onedit={() => editItem(doc, power.id)} ondelete={() => deleteItem(doc, power.id)} />{/if}
+            </div>
+          {/each}
         {/each}
       </section>
     {/if}
@@ -800,6 +817,11 @@
   }
   .line-name {
     flex: 1;
+  }
+  .ghoul-power {
+    margin-left: 14px;
+    color: var(--gl-muted-2);
+    font-size: 11px;
   }
   .line-name b {
     font-family: var(--gl-semi);

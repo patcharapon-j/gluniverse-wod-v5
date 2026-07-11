@@ -37,6 +37,7 @@
 
   const sys = $derived(snap.system);
   const items = $derived(snap.items as any[]);
+  const xpSpent = $derived((sys.xp?.history ?? []).filter((entry: any) => !entry.undone).reduce((sum: number, entry: any) => sum + (entry.cost ?? 0), 0));
 
   // Permission gates. `editable` mirrors the sheet's isEditable (ownership +
   // compendium locks; GMs are owners). `limited` renders the stripped view.
@@ -46,6 +47,7 @@
   const disciplines = $derived(items.filter((i) => i.type === "discipline"));
   const rituals = $derived(items.filter((i) => i.type === "ritual"));
   const ceremonies = $derived(items.filter((i) => i.type === "ceremony"));
+  const formulas = $derived(items.filter((i) => i.type === "formula"));
   const weapons = $derived(items.filter((i) => i.type === "weapon"));
   const armor = $derived(items.filter((i) => i.type === "armor"));
   const gear = $derived(items.filter((i) => i.type === "gear"));
@@ -585,22 +587,23 @@
     </section>
   </div>
 
-  <!-- rituals / ceremonies + equipment -->
+  <!-- rituals / ceremonies / formulae + equipment -->
   <div class="panels">
     <section class="panel brd">
       <div class="sect-h with-add">
-        Rituals &amp; Ceremonies
+        Rituals, Ceremonies &amp; Formulae
         {#if edit}
           <span class="add-group">
             <button class="add-btn" onclick={() => createItem(doc, "ritual")} title="Add Blood Sorcery ritual">+ Ritual</button>
             <button class="add-btn" onclick={() => createItem(doc, "ceremony")} title="Add Oblivion ceremony">+ Ceremony</button>
+            {#if sys.clan === "thinBlood"}<button class="add-btn" onclick={() => createItem(doc, "formula")} title="Add Thin-Blood formula">+ Formula</button>{/if}
           </span>
         {/if}
       </div>
-      {#if rituals.length === 0 && ceremonies.length === 0}
-        <p class="empty">Blood Sorcery rituals &amp; Oblivion ceremonies.</p>
+      {#if rituals.length === 0 && ceremonies.length === 0 && formulas.length === 0}
+        <p class="empty">Blood Sorcery rituals, Oblivion ceremonies &amp; Thin-Blood formulae.</p>
       {/if}
-      {#each [...rituals, ...ceremonies] as r (r.id)}
+      {#each [...rituals, ...ceremonies, ...formulas] as r (r.id)}
         <div class="adv gl-row" data-item-id={r.id}>
           <button class="adv-lbl reveal" onclick={() => reveal(r.id)}>
             <b>{r.name}</b><i>· {prettify(r.type)} {r.system.level}</i>
@@ -784,6 +787,7 @@
         <span>Total earned</span>
         <input class="xp-tot" type="number" min="0" value={sys.xp?.total ?? 0} disabled={!editable} onchange={(e) => up("system.xp.total", Number(e.currentTarget.value))} />
       </label>
+      <div class="xp-row2"><span>Tracked spent</span><strong class="xp-tot">{xpSpent}</strong></div>
       {#if editable}<button class="xp-spend" onclick={() => openXpDialog(doc)}>Spend Experience…</button>{/if}
     </section>
   </div>
