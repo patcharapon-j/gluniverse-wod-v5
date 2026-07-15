@@ -22,6 +22,8 @@ import { label } from "../components/labels.ts";
 export interface RollSeed {
   attribute?: string;
   skill?: string;
+  /** Optional second Attribute for Attribute + Attribute pools. */
+  secondAttribute?: string;
   /** Preselect a Discipline (by key) to add the actor's dots to the pool. */
   discipline?: string;
   /**
@@ -146,6 +148,8 @@ export interface RollDialogResult {
   attribute?: string;
   /** Chosen skill key, for request pool-deviation detection. */
   skill?: string;
+  /** Chosen second Attribute key for Attribute + Attribute pools. */
+  secondAttribute?: string;
   /** Chosen discipline key (additive option — never counts as deviation). */
   discipline?: string;
 }
@@ -164,14 +168,19 @@ function computeDeviation(
   const reqSkill = requested.skill ?? "";
   const gotAttr = chosen.attribute ?? "";
   const gotSkill = chosen.skill ?? "";
-  if (reqAttr === gotAttr && reqSkill === gotSkill) return undefined;
+  const gotSecondAttr = chosen.secondAttribute ?? "";
+  if (reqAttr === gotAttr && reqSkill === gotSkill && !gotSecondAttr) return undefined;
 
-  const fmt = (attr: string, skill: string): string =>
-    [attr && label("Attributes", attr), skill && label("Skills", skill)]
+  const fmt = (attr: string, skill: string, secondAttr = ""): string =>
+    [
+      attr && label("Attributes", attr),
+      skill && label("Skills", skill),
+      secondAttr && label("Attributes", secondAttr),
+    ]
       .filter(Boolean)
       .join(" + ") || "—";
 
-  return `requested ${fmt(reqAttr, reqSkill)}, rolled ${fmt(gotAttr, gotSkill)}`;
+  return `requested ${fmt(reqAttr, reqSkill)}, rolled ${fmt(gotAttr, gotSkill, gotSecondAttr)}`;
 }
 
 /** Convenience: open the pool dialog for an actor, seeded from a clicked trait. */

@@ -11,11 +11,12 @@ import type { V5RollResult } from "./roll-v5.ts";
 import { willpowerReroll, rollPool } from "./roll-v5.ts";
 import {
   rollCardHTML,
-  renderDiceTooltip,
+  cardHeroHTML,
   postRollCard,
   weaponDamageTotal,
   compulsionEligible,
 } from "./chat.ts";
+import { actorChatArt, type ChatArtTransform } from "./chat-art.ts";
 import type { WeaponRollInfo } from "./chat.ts";
 import {
   GENERAL_COMPULSIONS,
@@ -160,13 +161,12 @@ async function performWillpowerReroll(
     }
   }
 
-  const diceTooltip = await renderDiceTooltip(redo.roll);
   const content = rollCardHTML({
     actorName: (flags.actorName as string) ?? actor?.name ?? message.alias ?? "—",
     img: flags.img as string | undefined,
+    artTransform: (flags.artTransform as ChatArtTransform | undefined) ?? actorChatArt(actor),
     result: redo.result,
     flavor: (flags.flavor as string) ?? "Roll",
-    diceTooltip,
     bloodSurge: !!flags.bloodSurge,
     note,
     weapon: flags.weapon as WeaponRollInfo | undefined,
@@ -367,11 +367,21 @@ export async function applyDamageToActor(
   const extra = notes.length
     ? `<div class="gl-dmg-threshold">${notes.map(escHTML).join(" ")}</div>`
     : "";
+  const damageHero = cardHeroHTML({
+    actorName: actor.name ?? "—",
+    flavor: "Damage Applied",
+    img: actor.img,
+    artTransform: actorChatArt(actor),
+    compact: true,
+  });
   await ChatMessage.create({
     speaker: ChatMessage.getSpeaker({ actor }),
     content: `<div class="gl-card gl-damage-note">
-      <span class="gl-dmg-line">${escHTML(actor.name ?? "—")} takes ${amount}${escHTML(mit)}${from}</span>
-      ${extra}
+      ${damageHero}
+      <div class="gl-card-body">
+        <span class="gl-dmg-line">${escHTML(actor.name ?? "—")} takes ${amount}${escHTML(mit)}${from}</span>
+        ${extra}
+      </div>
     </div>`,
     flags: { [SYSTEM_ID]: { card: "damage" } },
   });
@@ -419,6 +429,8 @@ interface CompulsionCardFlags {
   actorUuid: string;
   actorName: string;
   img?: string;
+  eyebrow?: string;
+  artTransform?: ChatArtTransform;
   clan?: string;
   chosen?: CompulsionInfo;
 }
@@ -438,9 +450,13 @@ function canManageCompulsion(actor: any): boolean {
 
 /** Build the option-selection body of a compulsion card. */
 function compulsionSelectHTML(f: CompulsionCardFlags): string {
-  const portrait = f.img
-    ? `<img class="gl-card-portrait" src="${escHTML(f.img)}" alt="" onerror="this.style.display='none'"/>`
-    : "";
+  const hero = cardHeroHTML({
+    actorName: f.actorName,
+    flavor: "Compulsion",
+    img: f.img,
+    artTransform: f.artTransform,
+    compact: true,
+  });
   const options = compulsionOptions(f.clan)
     .map(
       (c) => `
@@ -453,39 +469,35 @@ function compulsionSelectHTML(f: CompulsionCardFlags): string {
     .join("");
   return `
   <div class="gl-card gl-compulsion" data-outcome="bestial">
-    <div class="gl-card-head">
-      ${portrait}
-      <div class="gl-card-id">
-        <span class="gl-card-actor">${escHTML(f.actorName)}</span>
-        <span class="gl-card-flavor">Compulsion</span>
-      </div>
+    ${hero}
+    <div class="gl-card-body">
+      <div class="gl-card-detail">The Beast stirs — choose a Compulsion to impose.</div>
+      <div class="gl-compulsion-opts">${options}</div>
     </div>
-    <div class="gl-card-detail">The Beast stirs — choose a Compulsion to impose.</div>
-    <div class="gl-compulsion-opts">${options}</div>
   </div>`;
 }
 
 /** Build the resolved body of a compulsion card (chosen Compulsion + resolve). */
 function compulsionChosenHTML(f: CompulsionCardFlags): string {
   const c = f.chosen!;
-  const portrait = f.img
-    ? `<img class="gl-card-portrait" src="${escHTML(f.img)}" alt="" onerror="this.style.display='none'"/>`
-    : "";
+  const hero = cardHeroHTML({
+    actorName: f.actorName,
+    flavor: `Compulsion — ${c.name}`,
+    img: f.img,
+    artTransform: f.artTransform,
+    compact: true,
+  });
   return `
   <div class="gl-card gl-compulsion gl-compulsion-active" data-outcome="bestial">
-    <div class="gl-card-head">
-      ${portrait}
-      <div class="gl-card-id">
-        <span class="gl-card-actor">${escHTML(f.actorName)}</span>
-        <span class="gl-card-flavor">Compulsion — ${escHTML(c.name)}</span>
+    ${hero}
+    <div class="gl-card-body">
+      <div class="gl-compulsion-body">
+        <span class="gl-compulsion-name">${escHTML(c.name)}</span>
+        <span class="gl-compulsion-sum">${escHTML(c.summary)}</span>
       </div>
-    </div>
-    <div class="gl-compulsion-body">
-      <span class="gl-compulsion-name">${escHTML(c.name)}</span>
-      <span class="gl-compulsion-sum">${escHTML(c.summary)}</span>
-    </div>
-    <div class="gl-card-actions">
-      <button type="button" class="gl-act" data-gl-action="compulsion-resolve">Resolve Compulsion</button>
+      <div class="gl-card-actions">
+        <button type="button" class="gl-act gl-act-primary" data-gl-action="compulsion-resolve">Resolve Compulsion</button>
+      </div>
     </div>
   </div>`;
 }
@@ -493,19 +505,19 @@ function compulsionChosenHTML(f: CompulsionCardFlags): string {
 /** Build the cleared body of a compulsion card (after Resolve). */
 function compulsionResolvedHTML(f: CompulsionCardFlags): string {
   const c = f.chosen;
-  const portrait = f.img
-    ? `<img class="gl-card-portrait" src="${escHTML(f.img)}" alt="" onerror="this.style.display='none'"/>`
-    : "";
+  const hero = cardHeroHTML({
+    actorName: f.actorName,
+    flavor: `Compulsion — ${c?.name ?? ""}`,
+    img: f.img,
+    artTransform: f.artTransform,
+    compact: true,
+  });
   return `
   <div class="gl-card gl-compulsion gl-compulsion-done" data-outcome="success">
-    <div class="gl-card-head">
-      ${portrait}
-      <div class="gl-card-id">
-        <span class="gl-card-actor">${escHTML(f.actorName)}</span>
-        <span class="gl-card-flavor">Compulsion — ${escHTML(c?.name ?? "")}</span>
-      </div>
+    ${hero}
+    <div class="gl-card-body">
+      <div class="gl-card-detail">Compulsion satisfied — the Beast is quieted.</div>
     </div>
-    <div class="gl-card-detail">Compulsion satisfied — the Beast is quieted.</div>
   </div>`;
 }
 
@@ -524,6 +536,7 @@ async function onCompulsion(message: any): Promise<void> {
     actorUuid,
     actorName: actor.name ?? "—",
     img: actor.img,
+    artTransform: actorChatArt(actor),
     clan: actor.system?.clan as string | undefined,
   };
   try {

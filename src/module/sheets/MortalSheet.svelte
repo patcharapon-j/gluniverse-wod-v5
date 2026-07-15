@@ -12,6 +12,7 @@
   import { openRollDialog, rollWeapon } from "../apps/RollDialogApp.ts";
   import { pickImage } from "../apps/image.ts";
   import { openXpDialog } from "../apps/XpDialogApp.ts";
+  import { openChatArtConfig } from "../apps/ChatArtConfigApp.ts";
 
   /* eslint-disable @typescript-eslint/no-explicit-any */
   interface Props {
@@ -144,6 +145,7 @@
         <div class="hdr-tools">
           {#if editable}
             <button class="mode-toggle" onclick={() => openXpDialog(doc)} title="Spend and review experience">{sys.xp?.value ?? 0} XP</button>
+            <button class="mode-toggle" onclick={() => openChatArtConfig(doc)} title="Frame this actor's chat-card image">Chat Art</button>
             <button class="mode-toggle" class:on={editMode} onclick={() => (editMode = !editMode)} title="Toggle play / edit">
               {editMode ? "🔓 Edit" : "🔒 Play"}
             </button>

@@ -26,6 +26,9 @@
   import { openFrenzyDialog } from "../dice/frenzy.ts";
   import { clanBane, clanCompulsion } from "../vtm/clans.ts";
   import { FEEDING_SOURCES, computeFeeding, applyFeeding } from "../vtm/feeding.ts";
+  import { cardHeroHTML } from "../dice/chat.ts";
+  import { actorChatArt } from "../dice/chat-art.ts";
+  import { openChatArtConfig } from "../apps/ChatArtConfigApp.ts";
 
   /* eslint-disable @typescript-eslint/no-explicit-any */
   interface Props {
@@ -109,11 +112,18 @@
     const summary = r.blockedReason
       ? `<span class="gl-feed-blocked">${r.blockedReason}</span>`
       : `Hunger <b>${r.before} → ${r.after}</b>${r.slaked ? ` <span class="gl-feed-slaked">(slaked ${r.slaked})</span>` : ""}`;
+    const feedHero = cardHeroHTML({
+      actorName: snap.name,
+      flavor: `Feeds — ${src?.label ?? sourceId}`,
+      img: snap.img,
+      artTransform: actorChatArt(doc),
+      compact: true,
+    });
     await ChatMessage.create({
       speaker: ChatMessage.getSpeaker({ actor: doc }),
       content: `<div class="gl-card gl-feed-card">
-        <div class="gl-card-head"><span class="gl-card-flavor">${snap.name} feeds — ${src?.label ?? sourceId}</span></div>
-        <div class="gl-feed-body">${summary}</div>
+        ${feedHero}
+        <div class="gl-card-body"><div class="gl-feed-body">${summary}</div></div>
       </div>`,
     });
     showFeed = false;
@@ -274,6 +284,7 @@
             </button>
             <button class="tool-btn" onclick={() => openBuilder(doc)} title="Step-by-step character builder">Builder</button>
             <button class="tool-btn" onclick={() => openXpDialog(doc)} title="Spend experience">Spend XP</button>
+            <button class="tool-btn" onclick={() => openChatArtConfig(doc)} title="Frame this actor's chat-card image">Chat Art</button>
             <button class="roll-cta" onclick={openPool} title="Build a dice pool">Roll Pool</button>
           {/if}
         </div>

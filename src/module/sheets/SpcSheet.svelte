@@ -5,6 +5,7 @@
   import { pickImage } from "../apps/image.ts";
   import { rollPool } from "../dice/roll-v5.ts";
   import { postRollCard } from "../dice/chat.ts";
+  import { openChatArtConfig } from "../apps/ChatArtConfigApp.ts";
 
   /* eslint-disable @typescript-eslint/no-explicit-any */
   interface Props {
@@ -85,6 +86,7 @@
       <div class="eyebrow">Antagonist · Storyteller Character</div>
       <input class="name" value={snap.name} disabled={!editable} onchange={(e) => editable && doc.update({ name: e.currentTarget.value })} />
       <input class="archetype" placeholder="Archetype / concept…" value={sys.archetype} disabled={!editable} onchange={(e) => up("system.archetype", e.currentTarget.value)} />
+      {#if editable}<button class="chat-art-btn" onclick={() => openChatArtConfig(doc)} title="Frame this actor's chat-card image">Chat Art</button>{/if}
     </div>
   </header>
 
@@ -225,6 +227,20 @@
     width: 100%;
     margin-top: 2px;
   }
+  .chat-art-btn {
+    align-self: flex-start;
+    margin-top: 7px;
+    padding: 4px 10px;
+    border: 1px solid var(--gl-line);
+    background: transparent;
+    color: var(--gl-muted-2);
+    font-family: var(--gl-cond);
+    font-size: 10px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    cursor: pointer;
+  }
+  .chat-art-btn:hover { border-color: var(--gl-blood); color: var(--gl-blood); }
   .grid {
     display: grid;
     grid-template-columns: 1fr 260px;
