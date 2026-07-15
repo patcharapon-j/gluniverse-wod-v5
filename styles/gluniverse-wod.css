@@ -960,3 +960,498 @@ body.theme-dark:not(.gl-scheme-light) {
   font-size: 13px;
   color: var(--gl-ink-soft);
 }
+
+/* ============================================================================
+ * Cinematic chat cards — art-led narrative redesign.
+ * These overrides intentionally sit after the legacy card rules so historical
+ * messages keep working while newly rendered cards use the diorama structure.
+ * ==========================================================================*/
+.chat-message:has(.gl-card) {
+  position: relative;
+  background: #211d19;
+  border: 1px solid #433a31;
+  border-left-width: 4px;
+  border-radius: 4px;
+  box-shadow: 0 10px 28px color-mix(in srgb, #000 28%, transparent);
+}
+.chat-message:has(.gl-card) .message-header {
+  position: absolute;
+  z-index: 20;
+  top: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0;
+  width: auto;
+  min-height: 0;
+  padding: 7px 9px;
+  background: transparent;
+  color: #b7aa96;
+  pointer-events: none;
+}
+.chat-message:has(.gl-card[data-outcome="messy"]),
+.chat-message:has(.gl-card[data-outcome="bestial"]) {
+  border-left-color: #a31820;
+}
+.chat-message:has(.gl-card) .message-sender,
+.chat-message:has(.gl-card) .message-metadata {
+  font-family: var(--gl-cond);
+  font-size: 10px;
+  line-height: 1.2;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: #b7aa96;
+}
+.chat-message:has(.gl-card) .message-sender {
+  display: none;
+}
+.chat-message:has(.gl-card) .message-metadata {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 3px 5px;
+  color: #e3d4c0;
+  text-shadow: 0 1px 5px #000;
+  background: color-mix(in srgb, #120f0d 58%, transparent);
+  pointer-events: auto;
+}
+.chat-message:has(.gl-card) .message-metadata .message-delete {
+  color: #e3d4c0;
+  text-shadow: 0 1px 5px #000;
+}
+.chat-message:has(.gl-card) .message-content {
+  position: relative;
+  overflow: hidden;
+}
+
+.gl-card {
+  padding: 0;
+  background: var(--gl-parch);
+  overflow: hidden;
+}
+.gl-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 11px 14px 14px;
+  color: var(--gl-ink);
+  background: var(--gl-parch);
+}
+
+/* The actor image is deliberately used twice: atmospheric fill + sharp subject. */
+.gl-card-hero {
+  position: relative;
+  height: 105px;
+  overflow: hidden;
+  isolation: isolate;
+  color: #f4e9da;
+  background: #15110f;
+}
+.gl-card-hero--compact {
+  height: 72px;
+}
+.gl-card-art {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+  user-select: none;
+}
+.gl-card-art--back {
+  opacity: 0.62;
+  filter: blur(14px) saturate(0.65) contrast(1.08);
+  transform: scale(1.13);
+}
+.gl-card-art--subject {
+  object-fit: contain;
+  object-position: center;
+  transform: translate(var(--gl-art-x, 0px), var(--gl-art-y, 0px)) scale(var(--gl-art-scale, 1));
+  transform-origin: center;
+  filter: saturate(0.7) contrast(1.08) brightness(0.84);
+}
+.gl-card-hero::after {
+  content: "";
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, rgba(8, 7, 6, 0.93) 0%, rgba(14, 10, 8, 0.67) 43%, rgba(68, 8, 11, 0.14) 78%),
+    linear-gradient(0deg, #15110f 0%, transparent 58%);
+}
+.gl-card[data-outcome="critical"] .gl-card-art--subject {
+  filter: saturate(0.72) contrast(1.08) brightness(0.88) sepia(0.12);
+}
+.gl-card[data-outcome="messy"] .gl-card-art--subject,
+.gl-card[data-outcome="bestial"] .gl-card-art--subject {
+  filter: saturate(0.74) contrast(1.1) brightness(0.84) sepia(0.05);
+}
+.gl-card[data-outcome="messy"] .gl-card-hero::after,
+.gl-card[data-outcome="bestial"] .gl-card-hero::after {
+  background:
+    linear-gradient(90deg, rgba(8, 7, 6, 0.94) 0%, rgba(25, 8, 8, 0.67) 44%, rgba(125, 16, 19, 0.16) 82%),
+    linear-gradient(0deg, #15110f 0%, transparent 58%);
+}
+.gl-card[data-outcome="failure"] .gl-card-art--subject,
+.gl-card[data-outcome="totalFailure"] .gl-card-art--subject {
+  filter: grayscale(0.48) saturate(0.5) contrast(1.05) brightness(0.66);
+}
+
+.gl-card-hero .gl-card-id {
+  position: absolute;
+  z-index: 2;
+  top: 9px;
+  left: 14px;
+  width: min(62%, 250px);
+  gap: 2px;
+  color: #f4e9da;
+}
+.gl-card-hero--compact .gl-card-id {
+  top: 9px;
+}
+.gl-card-eyebrow {
+  font-family: var(--gl-cond);
+  font-size: 9px;
+  font-weight: 500;
+  line-height: 1.2;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: #cdbc9f;
+}
+.gl-card-hero .gl-card-actor {
+  font-size: clamp(21px, 6.4vw, 26px);
+  line-height: 0.98;
+  color: #f5eadc;
+  text-shadow: 0 2px 12px #000;
+}
+.gl-card-hero--compact .gl-card-actor {
+  font-size: clamp(19px, 6vw, 23px);
+}
+.gl-card-hero .gl-card-flavor {
+  margin-top: 3px;
+  font-size: 10px;
+  line-height: 1.25;
+  color: #ead9c5;
+  text-shadow: 0 2px 8px #000;
+}
+
+/* The verdict sits inside the image stage, joined to the story beat. */
+.gl-card-hero .gl-card-tally {
+  position: absolute;
+  z-index: 2;
+  left: 14px;
+  right: 14px;
+  bottom: 6px;
+  min-height: 42px;
+  margin: 0;
+  padding: 0 2px 5px;
+  border: 0;
+  border-bottom: 1px solid rgba(239, 226, 207, 0.34);
+  color: #f4e9da;
+}
+.gl-card-hero--compact .gl-card-tally {
+  left: auto;
+  right: 12px;
+  min-height: 0;
+  padding: 0 0 5px;
+  justify-content: flex-end;
+}
+.gl-card-hero .gl-tally-num b,
+.gl-card-hero .gl-tally-num span,
+.gl-card-hero .gl-vs {
+  color: #f0dfc8;
+}
+.gl-card-hero .gl-tally-num b {
+  font-size: 36px;
+  text-shadow: 0 2px 12px #000;
+}
+.gl-card-hero .gl-tally-copy {
+  min-width: 0;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 1px;
+}
+.gl-card-hero .gl-tally-result {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+}
+.gl-card-hero .gl-tally-pool {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--gl-cond);
+  font-size: 10px;
+  letter-spacing: 1px;
+  color: #d4c4b0;
+  text-shadow: 0 2px 8px #000;
+}
+.gl-card-hero .gl-badge {
+  text-align: left;
+  font-size: 11px;
+  letter-spacing: 2px;
+  color: #f0dfc8;
+  text-shadow: 0 2px 10px #000;
+}
+.gl-card[data-outcome="critical"] .gl-card-hero .gl-badge { color: #e4bd5b; }
+.gl-card[data-outcome="messy"] .gl-card-hero .gl-badge,
+.gl-card[data-outcome="bestial"] .gl-card-hero .gl-badge { color: #ff6b72; }
+.gl-card[data-outcome="success"] .gl-card-hero .gl-badge { color: #a8d39f; }
+.gl-card[data-outcome="failure"] .gl-card-hero .gl-badge,
+.gl-card[data-outcome="totalFailure"] .gl-card-hero .gl-badge { color: #c7bbae; }
+
+/* No broken silhouettes: missing art becomes an intentional typographic stage. */
+.gl-card-hero--fallback {
+  height: 105px;
+  background: #15110f;
+  border-bottom: 2px solid var(--gl-blood);
+}
+.gl-card-hero--fallback::after {
+  opacity: 0.45;
+}
+.gl-card-hero--compact.gl-card-hero--fallback { height: 72px; }
+
+/* Dice land on a dark table regardless of the selected parchment theme. */
+.gl-card > .gl-dice {
+  box-sizing: border-box;
+  min-height: 62px;
+  margin: 0 12px;
+  padding: 11px 12px;
+  gap: 7px;
+  align-content: center;
+  background: #1a1613;
+  border: 1px solid #463b31;
+}
+.gl-card > .gl-dice .gl-die {
+  width: 38px;
+  height: 38px;
+  border-color: #817667;
+  background: #28231e;
+  color: #e8ded0;
+  box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.28);
+}
+.gl-card > .gl-dice .gl-die .gl-face {
+  width: 30px;
+  height: 30px;
+}
+.gl-card > .gl-dice .gl-die.hit {
+  border-color: #a89c8c;
+  color: #f0e6d8;
+}
+.gl-card > .gl-dice .gl-die.hunger {
+  border-color: #b6363d;
+  color: #fff1e4;
+  background: #620d11;
+}
+.gl-card > .gl-dice .gl-die.crit {
+  border-color: #e2bb57;
+  color: #fff8dc;
+  background: #8c6817;
+}
+.gl-card > .gl-dice .gl-die.hunger.crit,
+.gl-card > .gl-dice .gl-die.hunger.bane {
+  border-color: #e14b53;
+  background: #8e1017;
+  color: #fff3e8;
+}
+
+/* Willpower selection must sit after the cinematic dice-table rules so its
+   state cannot be visually flattened by the more specific card selectors. */
+.gl-card.gl-selecting > .gl-dice .gl-die[data-die-index] {
+  opacity: 0.52;
+  cursor: pointer;
+  filter: saturate(0.55) brightness(0.72);
+  transform: scale(0.94);
+  transition: opacity 120ms ease, filter 120ms ease, transform 120ms ease,
+    border-color 120ms ease, box-shadow 120ms ease;
+}
+.gl-card.gl-selecting > .gl-dice .gl-die[data-die-index]:hover {
+  opacity: 0.82;
+  filter: none;
+  transform: translateY(-2px) scale(1);
+  border-color: #e14b53;
+}
+.gl-card.gl-selecting > .gl-dice .gl-die.gl-selected,
+.gl-card.gl-selecting > .gl-dice .gl-die.gl-selected:hover {
+  z-index: 1;
+  opacity: 1;
+  filter: none;
+  transform: translateY(-4px) scale(1.08);
+  border-color: #ff737a;
+  outline: 3px solid #b4121b;
+  outline-offset: 2px;
+  box-shadow:
+    0 0 0 1px #ffd4cb,
+    0 0 16px rgba(225, 75, 83, 0.9),
+    inset 0 -3px 0 rgba(0, 0, 0, 0.28);
+}
+.gl-card.gl-selecting > .gl-dice .gl-die:not([data-die-index]) {
+  opacity: 0.22;
+  filter: grayscale(0.75);
+}
+
+.gl-card-meta {
+  gap: 10px;
+  margin: 0;
+  color: var(--gl-muted-2);
+}
+body.gl-scheme-dark .gl-card-meta,
+body.theme-dark:not(.gl-scheme-light) .gl-card-meta {
+  color: var(--gl-muted-2);
+}
+.gl-card-detail {
+  line-height: 1.45;
+}
+.gl-card-actions {
+  order: 5;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(112px, 1fr));
+  gap: 7px;
+  margin-top: 0;
+}
+.gl-act {
+  min-height: 32px;
+  padding: 6px 10px;
+  border-radius: 2px;
+  background: transparent;
+}
+.gl-act-primary {
+  border-color: var(--gl-blood);
+  background: #8d1016;
+  color: #f8eee1;
+}
+.gl-act-primary:hover {
+  border-color: var(--gl-blood-bright);
+  background: var(--gl-blood-bright);
+}
+.gl-card-breakdown {
+  order: 6;
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+.gl-card-breakdown > summary {
+  min-height: 20px;
+  display: flex;
+  align-items: center;
+}
+
+.gl-bestial-warn,
+.gl-surge-tag {
+  margin: 0;
+  border-radius: 0;
+  padding: 6px 12px;
+  text-align: center;
+}
+.gl-surge-tag {
+  display: block;
+}
+
+/* Compact family: Storyteller requests and old text-only receipts. */
+.gl-card-head {
+  min-height: 72px;
+  margin: 0;
+  padding: 14px;
+  border-bottom: 2px solid var(--gl-blood);
+  background: #171311;
+  color: #f4e9da;
+}
+.gl-card-head .gl-card-actor { color: #f4e9da; }
+.gl-card-head .gl-card-flavor { color: #cdbc9f; }
+.gl-card-head .gl-card-portrait {
+  width: 48px;
+  height: 48px;
+  border-color: #5b5044;
+}
+.gl-req-pool {
+  margin: 0;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--gl-line);
+  background: var(--gl-parch);
+}
+.gl-req .gl-card-body {
+  gap: 0;
+}
+.gl-req-target,
+.gl-req-oppo {
+  min-height: 46px;
+}
+.gl-req-portrait {
+  width: 34px;
+  height: 34px;
+  border-radius: 2px;
+}
+.gl-req-ribbon {
+  margin: 0 0 8px;
+  border-radius: 2px;
+}
+
+.gl-card-damage,
+.gl-compulsion-body {
+  margin-top: 0;
+  border-radius: 2px;
+}
+.gl-damage-note .gl-dmg-line,
+.gl-feed-body {
+  font-family: var(--gl-serif);
+  font-size: 16px;
+  line-height: 1.35;
+}
+.gl-compulsion-opts {
+  margin-top: 0;
+}
+.gl-compulsion-opt {
+  min-height: 54px;
+  border-radius: 2px;
+}
+.gl-compulsion-opt:hover .gl-compulsion-sum {
+  color: #f8eee1;
+}
+
+/* Entrance choreography follows the selected reading order. */
+.gl-anim .gl-card-art--subject {
+  animation: gl-art-enter 0.65s ease-out both;
+}
+.gl-anim .gl-card-hero .gl-card-id {
+  animation: gl-identity-enter 0.36s ease-out 0.08s both;
+}
+.gl-anim .gl-card-hero .gl-card-tally {
+  animation: gl-verdict-enter 0.36s cubic-bezier(0.2, 0.8, 0.3, 1.1) 0.15s both;
+}
+@keyframes gl-art-enter {
+  from { opacity: 0.55; }
+  to { opacity: 1; }
+}
+@keyframes gl-identity-enter {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes gl-verdict-enter {
+  from { opacity: 0; transform: translateY(7px); }
+  to { opacity: 1; transform: none; }
+}
+
+@media (max-width: 360px) {
+  .gl-card-hero { height: 105px; }
+  .gl-card-hero--compact { height: 72px; }
+  .gl-card-hero .gl-card-id { left: 12px; top: 8px; width: 64%; }
+  .gl-card-hero .gl-card-tally { left: 14px; right: 14px; }
+  .gl-card-hero .gl-tally-num b { font-size: 33px; }
+  .gl-card-hero .gl-badge {
+    font-size: 11px;
+    letter-spacing: 2px;
+    white-space: nowrap;
+  }
+  .gl-card > .gl-dice { padding: 10px 12px; gap: 6px; }
+  .gl-card > .gl-dice .gl-die { width: 34px; height: 34px; }
+  .gl-card-body { padding: 10px 12px 12px; }
+  .gl-card-actions { grid-template-columns: 1fr; }
+}

@@ -195,12 +195,14 @@ export function requestCardHTML(state: RequestState): string {
 
   return `
   <div class="gl-card gl-req${cancelled ? " gl-cancelled" : ""}">
-    ${ribbon}
     ${header}
-    ${oppositionRow}
-    <div class="gl-req-targets">${targetRows}</div>
-    ${resolution}
-    ${actions}
+    <div class="gl-card-body">
+      ${ribbon}
+      ${oppositionRow}
+      <div class="gl-req-targets">${targetRows}</div>
+      ${resolution}
+      ${actions}
+    </div>
   </div>`;
 }
 

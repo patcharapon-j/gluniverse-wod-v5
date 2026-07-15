@@ -30,7 +30,13 @@
   /* svelte-ignore state_referenced_locally */
   let attribute = $state(seed.attribute ?? "");
   /* svelte-ignore state_referenced_locally */
-  let skill = $state(seed.skill ?? "");
+  let secondTrait = $state(
+    seed.secondAttribute
+      ? `attribute:${seed.secondAttribute}`
+      : seed.skill
+        ? `skill:${seed.skill}`
+        : "",
+  );
   /* svelte-ignore state_referenced_locally */
   let discipline = $state(seed.discipline ?? "");
   /* svelte-ignore state_referenced_locally */
@@ -58,7 +64,17 @@
   const fixedPool = seed.fixedPool ?? 0;
 
   const attrVal = $derived(attribute ? (sys.attributes?.[attribute]?.value ?? 0) : 0);
-  const skillVal = $derived(skill ? (sys.skills?.[skill]?.value ?? 0) : 0);
+  const skill = $derived(secondTrait.startsWith("skill:") ? secondTrait.slice(6) : "");
+  const secondAttribute = $derived(
+    secondTrait.startsWith("attribute:") ? secondTrait.slice(10) : "",
+  );
+  const secondTraitVal = $derived(
+    skill
+      ? (sys.skills?.[skill]?.value ?? 0)
+      : secondAttribute
+        ? (sys.attributes?.[secondAttribute]?.value ?? 0)
+        : 0,
+  );
   const discVal = $derived(discipline ? disciplineRating(actor, discipline) : 0);
   const specialties = $derived<string[]>(skill ? (sys.skills?.[skill]?.specialties ?? []) : []);
   const specBonus = $derived(specialties.filter((s) => chosenSpecs[s]).length);
@@ -78,7 +94,7 @@
   const impairPenalty = $derived(applyImpaired ? -2 : 0);
 
   const pool = $derived(
-    Math.max(0, fixedPool + attrVal + skillVal + discVal + specBonus + modifier + resonance + impairPenalty),
+    Math.max(0, fixedPool + attrVal + secondTraitVal + discVal + specBonus + modifier + resonance + impairPenalty),
   );
   const totalPool = $derived(pool + surge);
 
@@ -98,6 +114,7 @@
         seed.poolLabel,
         attribute && label("Attributes", attribute),
         skill && label("Skills", skill),
+        secondAttribute && label("Attributes", secondAttribute),
         discipline && label("Disciplines", discipline),
       ]
         .filter(Boolean)
@@ -105,8 +122,11 @@
   );
 
   function roll() {
-    onroll({ pool, hunger, difficulty, flavor, bloodSurge, attribute, skill, discipline });
+    onroll({ pool, hunger, difficulty, flavor, bloodSurge, attribute, skill, secondAttribute, discipline });
   }
+
+  const dots = (value: number): string =>
+    value > 0 ? Array.from({ length: value }, () => "●").join(" ") : "";
 </script>
 
 <div class="gl-roll" class:surging={bloodSurge}>
@@ -129,17 +149,25 @@
       <select bind:value={attribute}>
         <option value="">—</option>
         {#each ATTRIBUTE_KEYS as k (k)}
-          <option value={k}>{label("Attributes", k)} ({sys.attributes?.[k]?.value ?? 0})</option>
+          <option value={k}>{label("Attributes", k)} {dots(sys.attributes?.[k]?.value ?? 0)}</option>
         {/each}
       </select>
     </label>
     <label class="pick">
-      <span>Skill</span>
-      <select bind:value={skill}>
+      <span>Second trait</span>
+      <select bind:value={secondTrait}>
         <option value="">—</option>
-        {#each SKILL_KEYS as k (k)}
-          <option value={k}>{label("Skills", k)} ({sys.skills?.[k]?.value ?? 0})</option>
-        {/each}
+        <optgroup label="Skills">
+          {#each SKILL_KEYS as k (k)}
+            {@const rating = sys.skills?.[k]?.value ?? 0}
+            <option class:untrained={rating === 0} value={`skill:${k}`}>{label("Skills", k)} {dots(rating)}</option>
+          {/each}
+        </optgroup>
+        <optgroup label="Attributes">
+          {#each ATTRIBUTE_KEYS as k (k)}
+            <option value={`attribute:${k}`}>{label("Attributes", k)} {dots(sys.attributes?.[k]?.value ?? 0)}</option>
+          {/each}
+        </optgroup>
       </select>
     </label>
   </div>
@@ -217,7 +245,7 @@
       {[
         fixedPool ? `${fixedPool} pool` : "",
         attrVal ? `${attrVal}` : "",
-        skillVal ? `${skillVal}` : "",
+        secondTraitVal ? `${secondTraitVal}` : "",
         discVal ? `${discVal} disc` : "",
         specBonus ? `${specBonus} spec` : "",
         modifier ? `${modifier < 0 ? "−" : "+"}${Math.abs(modifier)}` : "",
@@ -417,6 +445,15 @@
     color: var(--gl-ink);
     font-family: inherit;
     padding: 4px 6px;
+  }
+  select {
+    font-size: 15px;
+    font-weight: 700;
+  }
+  select option.untrained {
+    opacity: 0.52;
+    color: color-mix(in srgb, var(--gl-muted) 68%, transparent);
+    font-weight: 400;
   }
   .surge {
     display: flex;

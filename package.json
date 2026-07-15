@@ -6,8 +6,9 @@
   "private": true,
   "license": "MIT",
   "scripts": {
-    "build": "vite build && npm run build:packs",
+    "build": "vite build && npm run build:packs && npm run link:dev",
     "build:packs": "node scripts/build-packs.mjs",
+    "link:dev": "node scripts/link-dev-build.mjs",
     "watch": "vite build --watch",
     "check": "svelte-check --tsconfig ./tsconfig.json",
     "typecheck": "tsc --noEmit && npm run check",

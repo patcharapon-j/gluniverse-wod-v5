@@ -5,6 +5,8 @@
 import { mount, unmount } from "svelte";
 import XpDialog from "../sheets/XpDialog.svelte";
 import { SYSTEM_ID } from "../config.ts";
+import { cardHeroHTML } from "../dice/chat.ts";
+import { actorChatArt } from "../dice/chat-art.ts";
 import {
   purchaseWithXp,
   respecXp,
@@ -81,6 +83,12 @@ export async function respecAllXp(actor: any): Promise<number> {
 }
 
 function xpCard(actor: any, flavor: string, detail: string): string {
-  const name = foundry.utils.escapeHTML?.(actor.name) ?? actor.name;
-  return `<div class="gl-card gl-check"><div class="gl-card-head"><div class="gl-card-id"><span class="gl-card-actor">${name}</span><span class="gl-card-flavor">${flavor}</span></div></div><div class="gl-card-detail">${detail}</div></div>`;
+  const hero = cardHeroHTML({
+    actorName: actor.name ?? "—",
+    flavor,
+    img: actor.img,
+    artTransform: actorChatArt(actor),
+    compact: true,
+  });
+  return `<div class="gl-card gl-check">${hero}<div class="gl-card-body"><div class="gl-card-detail">${detail}</div></div></div>`;
 }

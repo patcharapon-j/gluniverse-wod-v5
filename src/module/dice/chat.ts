@@ -12,6 +12,7 @@
 
 import { SYSTEM_ID } from "../config.ts";
 import type { V5RollResult } from "./roll-v5.ts";
+import { actorChatArt, normalizeChatArt, type ChatArtTransform } from "./chat-art.ts";
 
 const OUTCOME_LABEL: Record<string, string> = {
   critical: "Critical",
@@ -116,10 +117,9 @@ export function compulsionEligible(actor: any, result: V5RollResult): boolean {
 export interface RollCardOptions {
   actorName: string;
   img?: string;
+  artTransform?: ChatArtTransform;
   result: V5RollResult;
   flavor: string;
-  /** Native Foundry `await roll.render()` HTML, embedded as the dice breakdown. */
-  diceTooltip?: string;
   /** Show the blood-surge band + a Rouse note. */
   bloodSurge?: boolean;
   /** Extra italic note under the dice (e.g. the Willpower re-roll line). */
@@ -132,8 +132,47 @@ export interface RollCardOptions {
   showCompulsion?: boolean;
 }
 
+export interface CardHeroOptions {
+  actorName: string;
+  flavor: string;
+  img?: string;
+  artTransform?: ChatArtTransform;
+  /** Roll cards reserve the stage for the actor name and result only. */
+  minimal?: boolean;
+  /** Compact narrative checks and utility cards use a shallower art stage. */
+  compact?: boolean;
+  /** Result UI placed at the foot of the image stage. */
+  overlay?: string;
+}
+
+/**
+ * Art-led identity stage shared by rolls, checks, Compulsions, and narrative
+ * notices. The actor image supplies a blurred backdrop and a sharp foreground
+ * crop; missing images intentionally fall back to a typographic header.
+ */
+export function cardHeroHTML(opts: CardHeroOptions): string {
+  const classes = ["gl-card-hero"];
+  if (opts.compact) classes.push("gl-card-hero--compact");
+  if (opts.minimal) classes.push("gl-card-hero--minimal");
+  classes.push(opts.img ? "gl-card-hero--art" : "gl-card-hero--fallback");
+  const artTransform = normalizeChatArt(opts.artTransform);
+  const artStyle = ` style="--gl-art-x:${artTransform.x}px;--gl-art-y:${artTransform.y}px;--gl-art-scale:${artTransform.scale}"`;
+  const art = opts.img
+    ? `<img class="gl-card-art gl-card-art--back" src="${esc(opts.img)}" alt="" onerror="this.style.display='none'"/>
+       <img class="gl-card-art gl-card-art--subject" src="${esc(opts.img)}" alt="${esc(opts.actorName)}" onerror="this.style.display='none'"/>`
+    : "";
+  return `<div class="${classes.join(" ")}"${artStyle}>
+    ${art}
+    <div class="gl-card-id">
+      <span class="gl-card-actor">${esc(opts.actorName)}</span>
+      ${opts.minimal ? "" : `<span class="gl-card-flavor">${esc(opts.flavor)}</span>`}
+    </div>
+    ${opts.overlay ?? ""}
+  </div>`;
+}
+
 /** Build the roll-card body (the message content Foundry wraps in its chrome). */
-export function rollCardHTML(opts: RollCardOptions): string {
+function rollCardHTMLLegacy(opts: RollCardOptions): string {
   const { result } = opts;
   // Difficulty 0 = open-ended roll: no Success/Failure verdict, just the tally.
   // Crits (and Messy) still show; a rolled Hunger 1 flags a potential Bestial
@@ -213,7 +252,6 @@ export function rollCardHTML(opts: RollCardOptions): string {
     ${diceRow(result)}
 
     <div class="gl-card-meta">
-      <span>${plural(result.rawSuccesses, "hit")}${result.bonusSuccesses ? ` + ${result.bonusSuccesses} crit` : ""}</span>
       ${critNote}
       ${result.hungerOnes > 0 ? `<span class="gl-bane-note">${plural(result.hungerOnes, "Hunger&nbsp;1")}</span>` : ""}
       ${result.messy ? `<span class="gl-bane-note">Messy</span>` : ""}
@@ -226,12 +264,6 @@ export function rollCardHTML(opts: RollCardOptions): string {
     ${opts.deviation ? `<div class="gl-card-detail"><em>⚠ ${esc(opts.deviation)}</em></div>` : ""}
 
     ${
-      opts.diceTooltip
-        ? `<details class="gl-card-breakdown"><summary>Dice</summary>${opts.diceTooltip}</details>`
-        : ""
-    }
-
-    ${
       actionButtons.length
         ? `<div class="gl-card-actions">${actionButtons.join("\n             ")}</div>`
         : ""
@@ -239,13 +271,85 @@ export function rollCardHTML(opts: RollCardOptions): string {
   </div>`;
 }
 
-/** Foundry's own rendered dice HTML for a Roll (the standard breakdown). */
-export async function renderDiceTooltip(roll: any): Promise<string> {
-  try {
-    return await roll.render();
-  } catch {
-    return "";
+// Kept as a compatibility reference while old message markup remains readable.
+void rollCardHTMLLegacy;
+
+/** Build the art-led roll card selected in the visual design pass. */
+export function rollCardHTML(opts: RollCardOptions): string {
+  const { result } = opts;
+  const openEnded = result.difficulty <= 0;
+  const potentialBestial = openEnded && result.won && result.hungerOnes > 0;
+  const showBadge = !openEnded || !["success", "failure"].includes(result.outcome);
+  const badge = OUTCOME_LABEL[result.outcome] ?? "Result";
+  const vsLine = openEnded
+    ? ""
+    : `<span class="gl-vs">vs Difficulty ${result.difficulty}</span>`;
+  const critNote = result.critPairs > 0
+    ? `<span class="gl-crit-note">+${result.bonusSuccesses} from ${result.critPairs} critical pair${result.critPairs > 1 ? "s" : ""}</span>`
+    : "";
+  const canReroll = !result.willpowerUsed && result.dice.some((d) => !d.hunger && !d.rerolled);
+  const plural = (n: number, word: string) =>
+    `${n} ${n === 1 ? word : word === "success" ? "successes" : `${word}s`}`;
+
+  let damageBlock = "";
+  const showDamage = !!opts.weapon && result.won;
+  if (opts.weapon && showDamage) {
+    const damage = weaponDamageTotal(result, opts.weapon);
+    damageBlock = `<div class="gl-card-damage">
+      <span class="gl-dmg-total"><b>${damage}</b> ${esc(opts.weapon.damageType)} damage</span>
+      <span class="gl-dmg-calc">margin ${result.margin} + ${esc(opts.weapon.name)} ${opts.weapon.damage}${result.margin + opts.weapon.damage < 1 ? " (min 1)" : ""}</span>
+    </div>`;
   }
+
+  const actionButtons: string[] = [];
+  if (opts.showCompulsion) {
+    actionButtons.push(`<button type="button" class="gl-act gl-act-primary gl-act-compulsion" data-gl-action="compulsion">Compulsion&hellip;</button>`);
+  }
+  if (showDamage) {
+    actionButtons.push(`<button type="button" class="gl-act gl-act-primary" data-gl-action="apply-damage">Apply Damage</button>`);
+  }
+  if (canReroll) {
+    const primary = actionButtons.length === 0 ? " gl-act-primary" : "";
+    actionButtons.push(`<button type="button" class="gl-act${primary}" data-gl-action="wp-reroll">Willpower Re-roll</button>`);
+  }
+
+  const resultLabel = showBadge ? badge : result.successes === 1 ? "Success" : "Successes";
+  const tally = `<div class="gl-card-tally gl-out-${result.outcome}">
+    <div class="gl-tally-num"><b>${result.successes}</b></div>
+    <div class="gl-tally-copy">
+      <span class="gl-tally-result"><span class="gl-badge">${resultLabel}</span>${vsLine}</span>
+      <span class="gl-tally-pool">${esc(opts.flavor)}</span>
+    </div>
+  </div>`;
+  const hero = cardHeroHTML({
+    actorName: opts.actorName,
+    flavor: "",
+    img: opts.img,
+    artTransform: opts.artTransform,
+    minimal: true,
+    overlay: tally,
+  });
+
+  const meta = [
+    critNote,
+    result.hungerOnes > 0 ? `<span class="gl-bane-note">${plural(result.hungerOnes, "Hunger&nbsp;1")}</span>` : "",
+    result.messy ? `<span class="gl-bane-note">Messy</span>` : "",
+  ].filter(Boolean).join("");
+
+  return `<div class="gl-card ${opts.bloodSurge ? "gl-surge" : ""}" data-outcome="${result.outcome}">
+    ${opts.bloodSurge ? `<div class="gl-surge-band" aria-hidden="true"></div>` : ""}
+    ${hero}
+    ${opts.bloodSurge ? `<div class="gl-surge-tag">Blood Surge &mdash; Rouse the Blood</div>` : ""}
+    ${potentialBestial ? `<div class="gl-bestial-warn">&#9888; Potential Bestial Failure</div>` : ""}
+    ${diceRow(result)}
+    <div class="gl-card-body">
+      ${meta ? `<div class="gl-card-meta">${meta}</div>` : ""}
+      ${damageBlock}
+      ${opts.note ? `<div class="gl-card-detail">${esc(opts.note)}</div>` : ""}
+      ${opts.deviation ? `<div class="gl-card-detail"><em>&#9888; ${esc(opts.deviation)}</em></div>` : ""}
+      ${actionButtons.length ? `<div class="gl-card-actions">${actionButtons.join("\n")}</div>` : ""}
+    </div>
+  </div>`;
 }
 
 /** Post a standard pool roll as a chat message carrying the Foundry Roll (DSN). */
@@ -269,14 +373,14 @@ export async function postRollCard(
 ): Promise<any> {
   const flavor = opts.flavor ?? "Roll";
   const img = actor?.img;
-  const diceTooltip = await renderDiceTooltip(roll);
+  const artTransform = actorChatArt(actor);
   const showCompulsion = compulsionEligible(actor, result);
   const content = rollCardHTML({
     actorName: actor?.name ?? "—",
     img,
+    artTransform,
     result,
     flavor,
-    diceTooltip,
     bloodSurge: opts.bloodSurge,
     note: opts.note,
     deviation: opts.deviation,
@@ -294,6 +398,7 @@ export async function postRollCard(
         actorUuid: actor?.uuid,
         actorName: actor?.name,
         img,
+        artTransform,
         flavor,
         bloodSurge: !!opts.bloodSurge,
         requestMessageId: opts.requestMessageId,
@@ -339,11 +444,10 @@ export async function waitForDiceAnimation(message: any): Promise<void> {
 }
 
 /** Post a single-purpose check (Rouse / Remorse / Frenzy) card. */
-export async function postCheckCard(actor: any, data: CheckCardData): Promise<any> {
+async function postCheckCardLegacy(actor: any, data: CheckCardData): Promise<any> {
   const chips = data.dice
     .map((v, i) => dieChip(v, data.kind === "rouse" ? "rouse" : "regular", false, i))
     .join("");
-  const diceTooltip = await renderDiceTooltip(data.roll);
   const img = data.img ?? actor?.img;
   const portrait = img
     ? `<img class="gl-card-portrait" src="${esc(img)}" alt="" onerror="this.style.display='none'"/>`
@@ -362,7 +466,40 @@ export async function postCheckCard(actor: any, data: CheckCardData): Promise<an
     </div>
     <div class="gl-dice">${chips}</div>
     <div class="gl-card-detail">${esc(data.detail)}</div>
-    ${diceTooltip ? `<details class="gl-card-breakdown"><summary>Dice</summary>${diceTooltip}</details>` : ""}
+  </div>`;
+  return await ChatMessage.create({
+    speaker: ChatMessage.getSpeaker({ actor }),
+    content,
+    rolls: [data.roll],
+    flags: { [SYSTEM_ID]: { card: data.kind } },
+  });
+}
+
+void postCheckCardLegacy;
+
+/** Post an art-led Rouse / Remorse / Frenzy check card. */
+export async function postCheckCard(actor: any, data: CheckCardData): Promise<any> {
+  const chips = data.dice
+    .map((value, index) => dieChip(value, data.kind === "rouse" ? "rouse" : "regular", false, index))
+    .join("");
+  const img = data.img ?? actor?.img;
+  const tally = `<div class="gl-card-tally ${data.success ? "gl-out-success" : "gl-out-failure"}">
+    <div class="gl-tally-badge"><span class="gl-badge">${data.success ? "Success" : "Failure"}</span></div>
+  </div>`;
+  const hero = cardHeroHTML({
+    actorName: actor?.name ?? "—",
+    flavor: data.title,
+    img,
+    artTransform: actorChatArt(actor),
+    compact: true,
+    overlay: tally,
+  });
+  const content = `<div class="gl-card gl-check" data-outcome="${data.success ? "success" : "failure"}">
+    ${hero}
+    <div class="gl-dice">${chips}</div>
+    <div class="gl-card-body">
+      <div class="gl-card-detail">${esc(data.detail)}</div>
+    </div>
   </div>`;
   return await ChatMessage.create({
     speaker: ChatMessage.getSpeaker({ actor }),
