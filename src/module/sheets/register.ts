@@ -9,12 +9,15 @@ import MortalSheet from "./MortalSheet.svelte";
 import SpcSheet from "./SpcSheet.svelte";
 import CoterieSheet from "./CoterieSheet.svelte";
 import ItemSheet from "./ItemSheet.svelte";
+import MobileSheet from "./MobileSheet.svelte";
 
 export function registerSheets(): void {
   const DocumentSheetConfig = foundry.applications.apps.DocumentSheetConfig;
 
-  const VampireApp = makeActorSheet(VampireSheet, { width: 1000, height: 940 });
-  const MortalApp = makeActorSheet(MortalSheet, { width: 1000, height: 820 });
+  // Player-character sheets get the compact mobile view on phone clients;
+  // SPC / Coterie stay on the full sheet everywhere.
+  const VampireApp = makeActorSheet(VampireSheet, { width: 1000, height: 940, mobileComponent: MobileSheet });
+  const MortalApp = makeActorSheet(MortalSheet, { width: 1000, height: 820, mobileComponent: MobileSheet });
   const SpcApp = makeActorSheet(SpcSheet, { width: 760, height: 720 });
   const CoterieApp = makeActorSheet(CoterieSheet, { width: 800, height: 700 });
   const ItemApp = makeItemSheet(ItemSheet, { width: 520, height: 620 });

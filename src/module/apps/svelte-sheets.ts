@@ -15,7 +15,37 @@ import { handleActorDrop } from "./actor-items.ts";
 interface SvelteSheetOptions {
   width?: number;
   height?: number;
+  /**
+   * Compact touch-first component mounted instead of `component` when the
+   * client is a phone (see {@link isMobileClient}) and the viewer is a player
+   * who owns the actor. Only player-character sheets pass one.
+   */
+  mobileComponent?: Component<any>;
 }
+
+/**
+ * Phone-client detection. The GLUniverse Suite companion module stamps
+ * `gl-mobile` on <body> when a phone connects; when the suite is absent we fall
+ * back to a coarse-pointer + small-viewport heuristic so the system degrades
+ * gracefully on its own.
+ */
+export function isMobileClient(): boolean {
+  if (document.body.classList.contains("gl-mobile")) return true;
+  try {
+    return (
+      matchMedia("(pointer: coarse)").matches &&
+      Math.min(window.innerWidth, window.innerHeight) <= 820
+    );
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Actors whose owner opted out of the mobile view via the sheet's "Full Sheet"
+ * button. Runtime-only (module-level, never persisted): reload = mobile again.
+ */
+const fullSheetOverrides = new Set<string>();
 
 /** Shared mixin body for both actor and item sheets. */
 function svelteSheetMixin(Base: any, component: Component<any>, opts: SvelteSheetOptions) {
@@ -47,10 +77,41 @@ function svelteSheetMixin(Base: any, component: Component<any>, opts: SvelteShee
         content?.matches?.(".window-content") ? content
         : (content?.querySelector?.(".window-content") as HTMLElement) ?? content;
       this._gl_state = new SheetState(this.document, this);
-      this._gl_svelte = mount(component, {
+      this._gl_svelte = mount(this._gl_component(), {
         target,
         props: { doc: this.document, snap: this._gl_state, app: this },
       });
+    }
+
+    /** Which component to mount right now: the mobile view for phone players. */
+    _gl_component(): Component<any> {
+      return this._gl_mobileActive() ? opts.mobileComponent! : component;
+    }
+
+    /**
+     * Mobile view applies only to player-owned character sheets on a phone
+     * client, and only until the player taps "Full Sheet" (session override).
+     */
+    _gl_mobileActive(): boolean {
+      if (!opts.mobileComponent) return false;
+      if ((globalThis as any).game?.user?.isGM) return false;
+      if (!this.document?.isOwner) return false;
+      if (fullSheetOverrides.has(this.document?.uuid)) return false;
+      return isMobileClient();
+    }
+
+    /** Runtime toggle between mobile and full view; remounts the Svelte root. */
+    glSetFullSheet(full: boolean): void {
+      const uuid = this.document?.uuid;
+      if (!uuid) return;
+      if (full) fullSheetOverrides.add(uuid);
+      else fullSheetOverrides.delete(uuid);
+      if (this._gl_svelte) {
+        unmount(this._gl_svelte);
+        this._gl_svelte = null;
+        this._gl_state = null;
+      }
+      this.render(true);
     }
 
     /** Drop handler the Svelte root binds to; actor sheets accept items. */
