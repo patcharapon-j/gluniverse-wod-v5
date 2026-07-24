@@ -67,6 +67,7 @@ function svelteSheetMixin(Base: any, component: Component<any>, opts: SvelteShee
 
     /** Mount once, then only re-sync the reactive snapshot on later renders. */
     _replaceHTML(_result: unknown, content: HTMLElement): void {
+      this._gl_syncMobileReturn();
       if (this._gl_svelte && this._gl_state) {
         this._gl_state.sync(this.document, this);
         return;
@@ -98,6 +99,35 @@ function svelteSheetMixin(Base: any, component: Component<any>, opts: SvelteShee
       if (!this.document?.isOwner) return false;
       if (fullSheetOverrides.has(this.document?.uuid)) return false;
       return isMobileClient();
+    }
+
+    /**
+     * The mobile sheet's "Full Sheet" button is one-way without this: while a
+     * phone player is on the full sheet, show a window-header button that
+     * drops the override and remounts the mobile view.
+     */
+    _gl_syncMobileReturn(): void {
+      const header = (this as any).element?.querySelector?.(".window-header") as HTMLElement | null;
+      if (!header) return;
+      const existing = header.querySelector(".gl-mobile-return");
+      const show =
+        !!opts.mobileComponent &&
+        !(globalThis as any).game?.user?.isGM &&
+        this.document?.isOwner &&
+        isMobileClient() &&
+        !this._gl_mobileActive();
+      if (!show) {
+        existing?.remove();
+        return;
+      }
+      if (existing) return;
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "header-control icon fa-solid fa-mobile-screen-button gl-mobile-return";
+      btn.dataset.tooltip = "Back to mobile sheet";
+      btn.setAttribute("aria-label", "Back to mobile sheet");
+      btn.addEventListener("click", () => this.glSetFullSheet(false));
+      header.insertBefore(btn, header.querySelector('[data-action="close"]'));
     }
 
     /** Runtime toggle between mobile and full view; remounts the Svelte root. */
